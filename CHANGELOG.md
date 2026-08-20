@@ -8,6 +8,7 @@ All notable changes to this project are documented here.
 
 - `process_episode.py`, a unified zero-key entrypoint for resolve → acquire → resumable chunking → local transcription → global timeline → searchable bundle.
 - `doctor.py`, an offline environment check for Python, output permissions, FFmpeg, yt-dlp/uv, and local transcription readiness.
+- `install_skill.py`, a cross-platform installer with collision refusal and recoverable forced updates.
 - Durable `progress.json` stage events and visible terminal updates for long-running work.
 - Product tests for the unified entrypoint and machine-readable zero-key diagnostics.
 - Evidence-aware cross-language retrieval: bilingual glossary expansion and translated claim/action/entity routing back to source segment IDs.

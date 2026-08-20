@@ -45,6 +45,14 @@ Per-chunk transcript files are resumable and reused by default. `--batch-size 4`
 
 ## Cross-Agent behavior
 
+From a cloned or extracted repository, install into Codex's default Skills directory with:
+
+```text
+python podcast-reader/scripts/install_skill.py --json
+```
+
+Pass `--target <skills-directory>` for another Agent. The installer refuses to overwrite an existing skill unless `--force` is explicit; forced updates preserve the previous directory as a timestamped sibling backup.
+
 - If the client supports Agent Skills and shell execution, it can run the bundled Python scripts.
 - If the client supports Agent Skills but no shell, it must supply equivalent native media/transcription tools.
 - If the client supports neither scripts nor audio tools, the skill can still analyze user-provided transcripts but cannot manufacture a transcription capability.

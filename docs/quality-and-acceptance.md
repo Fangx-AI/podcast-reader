@@ -11,6 +11,7 @@
 - 本地字幕可以一键生成 bundle、标准转录、字幕和索引；
 - 统一入口可以从任意工作目录处理本地字幕和媒体，并记录 `progress.json`；
 - 环境自检不联网、不下载、不要求 API Key，并能区分 ready/degraded/blocked；
+- 安装器可复制到任意 Skills 根目录，默认拒绝覆盖，强制更新保留备份；
 - 黄金 Markdown 通过严格结构/证据校验；
 - JSON 证据可导出 Excel 友好的 UTF-8 BOM CSV；
 - YouTube 公开字幕链路形成 `ready_for_analysis` bundle；

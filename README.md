@@ -20,7 +20,13 @@
 
 ## 30 秒开始
 
-将仓库中的 `podcast-reader/` 目录复制到 Agent 能发现的 Skills 目录。Codex 用户可使用：
+推荐用一条跨平台命令安装到 Codex；已有安装只有显式添加 `--force` 才会替换，并会保留时间戳备份：
+
+```text
+python podcast-reader/scripts/install_skill.py --json
+```
+
+也可以把仓库中的 `podcast-reader/` 目录手动复制到 Agent 能发现的 Skills 目录。Codex 默认位置是：
 
 ```text
 ~/.codex/skills/podcast-reader/
@@ -173,7 +179,7 @@ python podcast-reader/scripts/validate_notes.py episode/analysis.md --strict
 
 项目包含：
 
-- 37 个离线单元、契约与端到端场景；
+- 38 个离线单元、契约与端到端场景；
 - RSS、HTML、SRT、VTT 和黄金 Markdown 固定样例；
 - 所有 CLI 的 `--help` 接口测试；
 - Skill frontmatter、渐进披露和文档链接检查；

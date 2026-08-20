@@ -37,6 +37,16 @@ class BundleAndOutputTests(unittest.TestCase):
             self.assertFalse(result["network_used"])
             self.assertTrue(result["capabilities"]["transcript_and_index"])
 
+    def test_cross_platform_installer_copies_a_valid_skill(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "skills"
+            result = self.invoke("install_skill.py", "--target", target, "--json")
+            installed = target / "podcast-reader"
+            self.assertEqual(result["status"], "installed")
+            self.assertTrue((installed / "SKILL.md").is_file())
+            self.assertTrue((installed / "scripts" / "doctor.py").is_file())
+            self.assertFalse(any(installed.rglob("*.pyc")))
+
     def test_unified_process_entrypoint_handles_local_transcript(self):
         with tempfile.TemporaryDirectory() as folder:
             exact = Path(folder) / "episode"

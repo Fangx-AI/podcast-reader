@@ -6,7 +6,13 @@ It supports Bilibili, YouTube, RSS/Atom, episode pages, direct media URLs, and l
 
 ## Quick start
 
-Copy `podcast-reader/` into a Skills directory discovered by your Agent. For Codex:
+Install into Codex with one cross-platform command. Existing installations are replaced only with explicit `--force`, which preserves a timestamped backup:
+
+```text
+python podcast-reader/scripts/install_skill.py --json
+```
+
+You can also copy `podcast-reader/` into a Skills directory discovered by your Agent. For Codex:
 
 ```text
 ~/.codex/skills/podcast-reader/

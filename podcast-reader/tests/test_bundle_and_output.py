@@ -54,6 +54,8 @@ class BundleAndOutputTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready_for_analysis")
             self.assertFalse(result["api_key_required"])
             self.assertTrue((exact / "progress.json").is_file())
+            self.assertTrue((exact / "transcript-quality.json").is_file())
+            self.assertTrue((exact / "analysis-handoff.json").is_file())
 
     def test_golden_markdown_is_strictly_valid(self):
         result = self.invoke("validate_notes.py", FIXTURES / "golden-analysis.md", "--strict")
@@ -64,6 +66,7 @@ class BundleAndOutputTests(unittest.TestCase):
             exact = Path(folder) / "episode"
             self.invoke("prepare_episode.py", FIXTURES / "sample.srt", "--output-dir", exact)
             shutil.copy2(FIXTURES / "golden-analysis.md", exact / "analysis.md")
+            shutil.copy2(FIXTURES / "golden-evidence.json", exact / "evidence.json")
             result = self.invoke("finalize_bundle.py", exact)
             self.assertTrue(result["valid"])
             self.assertEqual(result["status"], "analyzed")

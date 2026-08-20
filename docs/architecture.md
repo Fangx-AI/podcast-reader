@@ -16,7 +16,7 @@
 | 层 | 组件 | 责任 |
 |---|---|---|
 | 交互路由 | `SKILL.md` | 判断来源、模式、分析意图、何时加载参考文档 |
-| 统一编排 | `process_episode.py` | 一条命令完成解析、字幕优先、必要时本地转写、全局时间线与索引 |
+| 统一编排 | `process_episode.py` | 一条命令完成解析、字幕优先、必要时本地转写、全局时间线、质量评估、索引和 Agent 分析交接 |
 | Bundle 编排 | `prepare_episode.py` | 来源摄取、外部转录回填、缓存和状态管理 |
 | 环境诊断 | `doctor.py` | 无网络检查 Python、FFmpeg、uv、yt-dlp、本地转写与输出权限 |
 | 来源 | `resolve_podcast.py`, `ingest_media.py`, `fetch_audio.py` | URL 分类、RSS/页面解析、字幕/媒体获取 |
@@ -25,9 +25,10 @@
 | 检索 | `chunk_transcript.py`, `search_chunks.py` | 长文本分块、跨中英文关键词检索、邻近上下文 |
 | 视觉 | `extract_keyframes.py` | 有界关键帧、联系表、时间戳 manifest |
 | 导出 | `export_evidence.py`, 模板 | Markdown、JSON、SRT、VTT、CSV |
-| 质量 | `validate_bundle.py`, `validate_notes.py`, tests | 结构、证据、占位符、接口和回归检查 |
+| 质量 | `validate_bundle.py`, `validate_notes.py`, `validate_evidence.py`, tests | 结构、精确引文、时间范围、证据覆盖、接口和回归检查 |
+| 阅读与分享 | `render_reader.py`, `export_bundle.py`, `cleanup_bundle.py` | 可搜索阅读器、隐私净化分享包、预览优先存储回收 |
 
-`process_episode.py` 将阶段事件同时输出到终端并持久化为 `progress.json`。长音频按块恢复；重复运行已完成来源时，不重新下载或转写。
+`process_episode.py` 将阶段事件同时输出到终端并持久化为 `progress.json`；`transcription-progress.json` 记录分块百分比、耗时和 ETA。长音频块以来源 SHA-256、设置、连续序号和时长覆盖为缓存不变量；任一不匹配都会安全重建。
 
 ## 状态机
 
@@ -51,6 +52,8 @@ new
 - 画面观察与口头陈述分开存储和引用。
 - 外部事实核验与节目证据分开引用。
 - 任务包中的路径不得逃逸出 episode 目录。
+- 分享包不得暴露本机绝对路径、凭据或临时签名参数；默认不得包含完整逐字稿。
+- `analyzed` 必须同时具有严格通过的 `analysis.md`、`evidence.json` 和 `reader.html`。
 
 ## 多语言检索
 

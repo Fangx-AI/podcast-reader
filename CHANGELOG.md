@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here.
 
+## 2.0.0 — 2026-08-20
+
+### Reliability and security
+
+- Verify chunk caches with source SHA-256 fingerprints, settings, contiguous indexes, and full-duration coverage; rebuild incomplete caches transactionally.
+- Validate local transcript caches against source and decoding settings; quarantine corrupt/legacy partial files and write all durable JSON atomically.
+- Return an action-required exit code for selection/partial states instead of false success.
+- Distinguish installed, bootstrap-capable, and offline-ready capabilities in Doctor; test real output writes and report free disk space.
+- Reject loopback, private, link-local, reserved, credential-bearing, and unsafe redirect targets by default.
+
+### Evidence and user experience
+
+- Require `analysis.md` plus schema-validated `evidence.json` before `analyzed`; verify enums, segment references, timestamp ranges, chapter order, and exact quotes.
+- Add a provider-neutral Agent analysis handoff, transcript quality assessment, per-chunk percentage/ETA, partial transcript publication, and overlapped speech chunks.
+- Add arbitrary target-language translation requests/application, provider-neutral diarization turns, compact budgeted retrieval, and retrieval confidence.
+- Generate an accessible searchable `reader.html` with platform timestamp links.
+- Add privacy-sanitized share/portable/archive exports and preview-first cache/media cleanup.
+
+### Release engineering
+
+- Add single-source `VERSION`, downgrade protection, backup listing/pruning/rollback, release invariant checks, CycloneDX SBOM generation, deterministic ZIPs, and SHA-256 sidecars.
+- Expand regression coverage for every confirmed v1.4 audit defect and pin GitHub Actions by commit.
+
 ## 1.4.0 — 2026-08-20
 
 ### Added

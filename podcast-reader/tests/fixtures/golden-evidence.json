@@ -1,0 +1,40 @@
+{
+  "schema_version": "2.0",
+  "episode": {
+    "title": "第一期开箱：证据驱动的播客分析",
+    "show": "示例播客",
+    "published": null,
+    "duration_seconds": 18,
+    "source_url": "https://example.com/episode-001"
+  },
+  "summary": "这期节目认为，可靠的评估体系是 AI Agent 产品化的前提。",
+  "chapters": [
+    {"start": "00:00:01", "end": "00:00:06", "title": "开场", "summary": "介绍 AI Agent 讨论主题。", "speakers": ["主持人"]},
+    {"start": "00:00:06", "end": "00:00:18", "title": "可靠评估", "summary": "嘉宾提出可靠评估的重要性，主持人总结产品意义。", "speakers": ["嘉宾", "主持人"]}
+  ],
+  "claims": [
+    {
+      "claim": "可靠评估比单纯扩大模型更关键。",
+      "speaker": "嘉宾",
+      "kind": "opinion",
+      "support": "stated",
+      "confidence": "high",
+      "verification": "not_checked",
+      "evidence": [{"start": "00:00:06", "end": "00:00:12", "segment_ids": [2], "label": "transcript indicates"}]
+    }
+  ],
+  "quotes": [
+    {"text": "The key is reliable evaluation, not just a bigger model.", "speaker": "嘉宾", "start": "00:00:06", "end": "00:00:12", "segment_ids": [2]}
+  ],
+  "actions": [
+    {"action": "在 Agent 产品上线前建立可靠评估体系。", "for_whom": "AI 产品团队", "prerequisites": ["明确任务和失败标准"], "risks": ["样例不足可能造成过拟合"], "evidence": [{"start": "00:00:12", "end": "00:00:18", "segment_ids": [3], "label": "transcript indicates"}]}
+  ],
+  "entities": [
+    {"name": "AI Agent", "type": "concept", "context": "节目讨论对象", "evidence": [{"start": "00:00:01", "end": "00:00:05", "segment_ids": [1], "label": "transcript indicates"}]}
+  ],
+  "glossary": [
+    {"source_term": "reliable evaluation", "preferred_term": "可靠评估", "type": "concept", "note": "节目核心术语", "evidence": [{"start": "00:00:06", "end": "00:00:12", "segment_ids": [2], "label": "transcript indicates"}]}
+  ],
+  "visual_evidence": [],
+  "limitations": ["样例只有 18 秒。"]
+}

@@ -102,7 +102,7 @@ def expand_from_evidence(
 
 
 def rank(chunks: list[dict[str, Any]], query: str, segment_boosts: dict[int, float] | None = None) -> list[dict[str, Any]]:
-    query_terms = terms(query)
+    query_terms = [term for term in terms(query) if term not in EVIDENCE_STOP_TERMS]
     lowered_query = query.casefold().strip()
     document_frequency = {term: sum(term in str(chunk.get("search_text") or chunk.get("text") or "").casefold() for chunk in chunks) for term in query_terms}
     ranked = []
@@ -134,6 +134,8 @@ def main() -> int:
     parser.add_argument("--context", type=int, default=0, help="Include this many adjacent chunks around hits")
     parser.add_argument("--evidence", help="Optional evidence.json for cross-language glossary expansion; defaults beside chunks.json")
     parser.add_argument("--no-expand", action="store_true", help="Disable automatic glossary expansion")
+    parser.add_argument("--max-chars", type=int, default=12000, help="Maximum combined hit text returned")
+    parser.add_argument("--compact", action="store_true", help="Return compact hit records without index-only fields")
     args = parser.parse_args()
     chunks_path = Path(args.chunks).expanduser().resolve()
     data = json.loads(chunks_path.read_text(encoding="utf-8-sig"))
@@ -142,7 +144,21 @@ def main() -> int:
     expanded_query, expansions, segment_boosts, evidence_matches = (
         (args.query, [], {}, []) if args.no_expand else expand_from_evidence(args.query, evidence_path)
     )
-    hits = rank(chunks, expanded_query, segment_boosts)[:max(1, args.top_k)]
+    ranked = rank(chunks, expanded_query, segment_boosts)
+    hits = []
+    used_chars = 0
+    for item in ranked[:max(1, args.top_k)]:
+        text_value = str(item.get("text") or "")
+        remaining = max(0, args.max_chars - used_chars)
+        if args.max_chars and not remaining:
+            break
+        if args.max_chars and len(text_value) > remaining:
+            text_value = text_value[:remaining].rstrip() + "…"
+        record = {**item, "text": text_value}
+        if args.compact:
+            record = {key: value for key, value in record.items() if key not in {"search_text", "keywords", "segments"}}
+        hits.append(record)
+        used_chars += len(text_value)
     if args.context and hits:
         by_id = {item.get("chunk_id"): item for item in chunks}
         wanted: set[int] = set()
@@ -162,6 +178,12 @@ def main() -> int:
         "hit_count": len(hits),
         "hits": hits,
         "context_chunks": context_chunks,
+        "returned_chars": used_chars,
+        "truncated_by_budget": len(hits) < min(len(ranked), max(1, args.top_k)),
+        "retrieval_confidence": (
+            "high" if hits and hits[0]["score"] >= 8 and (len(hits) == 1 or hits[0]["score"] >= hits[1]["score"] * 1.25)
+            else "medium" if hits and hits[0]["score"] >= 3 else "low"
+        ),
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if hits else 3

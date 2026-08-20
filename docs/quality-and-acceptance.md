@@ -10,7 +10,7 @@
 - 离线测试不访问网络并全部通过；
 - 本地字幕可以一键生成 bundle、标准转录、字幕和索引；
 - 统一入口可以从任意工作目录处理本地字幕和媒体，并记录 `progress.json`；
-- 环境自检不联网、不下载、不要求 API Key，并能区分 ready/degraded/blocked；
+- 环境自检不联网、不下载、不要求 API Key，并能区分 `offline_ready`、`bootstrap_ready`、`core_only` 和 `blocked`；
 - 安装器可复制到任意 Skills 根目录，默认拒绝覆盖，强制更新保留备份；
 - 黄金 Markdown 通过严格结构/证据校验；
 - JSON 证据可导出 Excel 友好的 UTF-8 BOM CSV；
@@ -21,6 +21,11 @@
 - 公开 RSS 可以精确匹配或显式选择最新一期；
 - 本地视频可以生成关键帧 manifest 与 contact sheet；
 - 无未处理 TODO、FIXME 或程序占位实现。
+- 损坏、缺块、来源变更或参数变更的缓存不会被静默复用；
+- `needs_selection`、`partial` 等状态不得返回完成退出码；
+- 内网/回环 URL 默认拒绝，分享包不含绝对本机路径或完整逐字稿；
+- `analyzed` 报告的短引、时间戳、枚举和 segment 引用必须全部通过严格证据校验；
+- 任意目标语言翻译必须保持 100% segment 覆盖，阅读器时间戳必须可跳转。
 - [用户体验验收矩阵](ux-acceptance.md)中的 12 个核心场景具有自动化或前向测试证据。
 
 ## 测试分层

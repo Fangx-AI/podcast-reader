@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from runtime_utils import atomic_write_json
+
 
 WORD = re.compile(r"[A-Za-z0-9_+#.-]{2,}|[\u3400-\u9fff]")
 SENTENCE_BREAK = re.compile(r"(?<=[。！？!?；;\.])\s+|\n+")
@@ -169,7 +171,7 @@ def main() -> int:
     }
     output = Path(args.output).expanduser().resolve() if args.output else source.with_name("chunks.json")
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(output, document)
     print(json.dumps({"status": "ready", "output": str(output), "segment_count": len(source_segments), "indexed_segment_count": len(segments), "chunk_count": len(chunks)}, ensure_ascii=False, indent=2))
     return 0
 

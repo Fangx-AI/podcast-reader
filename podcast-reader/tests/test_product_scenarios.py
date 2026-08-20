@@ -141,10 +141,10 @@ class ProductScenarioTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as folder:
                 base = f"http://127.0.0.1:{server.server_port}"
-                blocked = self.invoke("fetch_audio.py", f"{base}/html/default.mp3", "--output-dir", folder, expected=1)
+                blocked = self.invoke("fetch_audio.py", f"{base}/html/default.mp3", "--output-dir", folder, "--allow-private-network", expected=1)
                 self.assertEqual(blocked["stage"], "download")
-                first = self.invoke("fetch_audio.py", f"{base}/one/default.mp3", "--output-dir", folder)
-                second = self.invoke("fetch_audio.py", f"{base}/two/default.mp3", "--output-dir", folder)
+                first = self.invoke("fetch_audio.py", f"{base}/one/default.mp3", "--output-dir", folder, "--allow-private-network")
+                second = self.invoke("fetch_audio.py", f"{base}/two/default.mp3", "--output-dir", folder, "--allow-private-network")
                 self.assertNotEqual(first["path"], second["path"])
         finally:
             server.shutdown()

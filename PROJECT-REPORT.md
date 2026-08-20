@@ -1,64 +1,61 @@
-# Podcast Reader v1.4 项目交付报告
+# Podcast Reader v2.0 项目交付报告
 
-## 目标
+## 交付结论
 
-打造一个达到成熟开源项目标准的 Codex Skill：用户只提供播客或长视频链接，即可完成公开来源摄取、字幕/转写、多语言处理、说话人区分、时间戳索引、深度拆解、持续问答、画面分析和多格式导出，同时具备清晰文档、错误恢复、安全边界、测试和 CI。
+Podcast Reader 已从“能读取播客”升级为可发布的长内容研究 Skill：用户只需提供 Bilibili、YouTube、RSS、节目页、媒体直链或本地文件，当前 Agent 即可完成来源解析、字幕优先获取、零 Key 本地转写、时间戳索引、证据约束分析、持续追问、翻译/说话人回填、可点击阅读器及安全导出。
 
-## 完成范围
+v2 的核心原则是：**不伪装成功、不伪造证据、不静默漏内容、不把 API Key 变成核心前置条件。**
 
-1. 研究 Podwise、Armory YouTube Analysis、MCP Video Analyzer 和高质量 Skill 编写规范。
-2. 完成原型架构、脚本、输出和用户体验审计。
-3. 重写主 `SKILL.md`，建立 quick / standard / deep 档位与自然语言意图路由。
-4. 实现 Bilibili、YouTube、RSS、网页、直链和本地文件来源链路。
-5. 实现字幕优先、音频兜底、说话人/多语言规范和转录质量阶梯。
-6. 实现统一 transcript schema、SRT/VTT/JSON/Markdown 转换、长文本分块与中英文检索。
-7. 实现播客专用论证、主张、说话人、事实核查、学习、改写和跨节目工作流。
-8. 实现视频关键帧、联系表与独立画面证据链。
-9. 实现漂亮的中文分析模板、evidence schema 和 Excel 友好 CSV 导出。
-10. 实现 bundle 状态、缓存复用、阶段性警告、恢复建议、隐私/版权/提示注入规则。
-11. 建立 38 项离线场景、固定夹具、黄金报告、接口契约和跨平台 CI。
-12. 增加统一零 Key 入口、无网络环境自检、持久进度与缓存恢复体验。
-13. 增加默认不覆盖、强制更新保留备份的跨平台 Skill 安装器。
-12. 完成 YouTube、Bilibili、RSS 和 FFmpeg 画面公开冒烟验证。
-13. 真实验证 Bilibili HTTP 412 后的公开 API 多分 P 音频兜底，以及超 25 MB 音频的自动切分与全局时间轴恢复。
-14. 完成无 API Key 的本地 `faster-whisper` 适配器、隔离自动引导、语言自动检测和跨 Agent 能力阶梯。
+## v2 关键升级
 
-## 核心指标
+1. **端到端闭环**：统一入口在转录后生成分析交接契约；Skill 要求当前 Agent 继续写入 `analysis.md`、`evidence.json`，严格校验后才可报告 `analyzed`。
+2. **可恢复长任务**：来源 SHA-256、参数指纹、切块连续性、总时长覆盖和逐块缓存全部校验；损坏缓存自动隔离并重建。
+3. **真实进度**：持久化阶段、百分比、已完成块数、耗时、ETA 和 partial transcript；中断后可继续。
+4. **严格证据**：短引必须逐字存在于被引用 segment；章节、时间戳、枚举、主张和 segment 引用均有机器校验。
+5. **多语言与说话人**：任意目标语言使用 100% segment 覆盖契约；供应商中立的说话人时间段适配器按重叠回填。
+6. **零配置优先**：公开字幕优先，随后才获取音频；本地 `faster-whisper` 为零 Key 兜底；已配置云能力只是可选加速器。
+7. **平台韧性**：字幕按“首选人工轨 → 源语言人工轨 → 自动轨”逐条回退，单轨 429 不再拖垮整个来源；Bilibili 可用公开 API 合法降级。
+8. **安全分享**：分享包默认排除完整逐字稿，净化本机路径与敏感 URL 参数；完整 transcript 只能显式加入。
+9. **无障碍阅读**：自动生成单文件 `reader.html`，支持全文搜索、键盘焦点、移动端、屏幕阅读器状态及 YouTube/Bilibili 时间跳转。
+10. **工程化发布**：单一版本源、固定依赖、固定 GitHub Action SHA、CycloneDX SBOM、确定性 ZIP、SHA-256、安装备份/回滚和防降级。
 
-| 指标 | 结果 |
+## 当前质量指标
+
+| 指标 | v2.0.0 结果 |
 |---|---:|
-| 项目文件 | 55 |
-| Skill Python CLI | 14 |
-| 单层参考文档 | 8 |
-| 离线自动测试 | 32 / 32 通过（当前 Python 3.14；核心 v1.1 矩阵已覆盖 3.11/3.12/3.14） |
-| GitHub CI 组合 | Windows/Linux × Python 3.11/3.12/3.14 |
-| 官方 Skill 快速校验 | 通过 |
-| SKILL.md 行数 | 少于 500 |
-| 未完成 TODO/FIXME/TBD | 0（验证器检测字符串除外） |
-| Markdown 相对链接 | 全部存在 |
+| Skill Python CLI | 31 |
+| 离线自动测试 | 55 / 55 通过 |
+| `SKILL.md` | 159 个物理行，低于 500 行门槛 |
+| Skill 内部链接 | 10 / 10 有效 |
+| 发布版本源 | `podcast-reader/VERSION` = `2.0.0` |
+| CI | Windows / Linux × Python 3.11 / 3.12 / 3.14 |
+| 核心 API Key | 0 |
+| 未处理 TODO/FIXME | 0（验证器检测字面量和受控异常分支除外） |
 
-## 真实验证结论
+## 真实前向验证
 
-- YouTube：TED 公开英文字幕成功进入 `ready_for_analysis`，转录、字幕、索引与 bundle 校验全部通过。
-- Bilibili：以 `BV1a5ECzqEVB` 完成真实长视频验证。yt-dlp 遇到平台 412 后，公开 API 成功获取 2 个分 P、12,139.015 秒音频；未使用 Cookie。
-- 长音频：218.7 MB 原始音频成功生成 8 个 API 安全 Opus 块，最大约 5.47 MB，并保留跨分 P 的全局时间偏移。
-- 无 Key 转写：真实 30 秒样本通过 `uv` 自动安装隔离依赖、下载 tiny 模型并在 CPU int8 上输出 11 个带时间戳片段；语言自动识别为英文，概率约 0.995。
-- RSS：NPR Planet Money 公开 Feed 成功解析并显式选择最新节目。
-- 视频画面：本地可再现视频成功生成关键帧、manifest 和 contact sheet。
+- **YouTube**：TED 844 秒公开视频，无 Key、无音视频下载，取得发布者 `zh-CN` VTT，生成 316 个时间戳片段；转录质量 100 分、零警告，状态 `ready_for_analysis`。
+- **Bilibili**：用户提供的 `BV1a5ECzqEVB` 成功读取 11,778.687 秒公开元数据；当前页面不公开字幕时返回合法 `partial`、明确下一步且不使用 Cookie。v1 长链路证据已验证同一来源的 2 个分 P、12,139.015 秒公开音频、8 个可恢复块及 1,897 个本地转录片段。
+- **RSS**：NPR Planet Money 公开 Feed 解析 355 期，`--latest` 精确选择最新一期，只保存元数据、不下载音频，bundle 校验通过。
+- **本地完整闭环**：固定 SRT 生成 transcript、索引、质量报告、分析契约；黄金分析和证据经严格校验后生成可点击 reader，最终 `analyzed`。
+- **隐私导出**：默认分享 ZIP 不含完整逐字稿和绝对本机路径；独立校验通过并输出 SHA-256。
+- **恢复性**：删除一个已缓存音频块后重跑，系统识别缺块并事务式重建，而非静默复用不完整结果。
+
+详细命令与结果见 [docs/smoke-results.md](docs/smoke-results.md)、[docs/ux-acceptance.md](docs/ux-acceptance.md) 和 [docs/quality-and-acceptance.md](docs/quality-and-acceptance.md)。
 
 ## 交付结构
 
-- `podcast-reader/`：可安装 Skill 本体。
-- `README.md` / `README.en.md`：项目介绍与使用指南。
-- `docs/`：架构、竞品基准、验收标准和冒烟报告。
-- `.github/`：CI、Issue 和 PR 模板。
-- `CONTRIBUTING.md` / `SECURITY.md` / `CHANGELOG.md` / `LICENSE`：开源项目治理文件。
+- `podcast-reader/`：可直接安装的 Skill 本体。
+- `podcast-reader/scripts/`：解析、获取、转写、分析契约、验证、导出、安装和发布 CLI。
+- `podcast-reader/references/`：Agent 运行时按需读取的流程与格式规范。
+- `README.md` / `README.en.md`：中英文用户入口。
+- `docs/`：架构、竞品、验收、真实测试和发布说明。
+- `.github/`：CI、Release、Dependabot、Issue 与 PR 模板。
 
-## 已知边界
+## 明确边界
 
-- 平台字幕和媒体可用性会随地区、登录状态、反爬策略和 yt-dlp 版本变化。
-- 没有公开字幕时，完整内容分析需要可用的转写能力或用户提供的媒体/字幕。
-- 画面 lane 使用代表性采样，不能证明未采样时刻没有某个视觉事件。
-- 完整受版权保护 transcript 默认不作为交付物；项目优先分析、导航和短引。
-
-当前版本通过真实 Bilibili 长视频、统一入口和无 Key 本地转写前向测试，正在按 GitHub v1.4.0 发布门继续执行公开链接与持续追问验收。v1.1 的完整产品审计仍保留在 `docs/product-audit-v1.1.md`，当前用户体验证据见 `docs/ux-acceptance.md`，后续修复记录见 `CHANGELOG.md` 与 `docs/smoke-results.md`。
+- 不绕过 DRM、付费墙、登录、地区限制、私人 Feed 或平台访问控制。
+- 没有公开字幕时，完整语义分析仍需要公开/授权媒体或用户提供的 transcript。
+- 本地首次转写可能需要联网下载隔离依赖和模型，并消耗本机 CPU/GPU。
+- 说话人分离质量取决于宿主或用户提供的 diarization 时间段；项目不会把猜测包装成可靠身份。
+- 完整受版权保护逐字稿默认不进入分享包；分析、导航、短引与证据出处优先。

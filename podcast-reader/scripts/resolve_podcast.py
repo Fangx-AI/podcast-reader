@@ -23,6 +23,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from runtime_utils import safe_urlopen
+
 
 MEDIA_EXTENSIONS = {
     ".mp3", ".m4a", ".mp4", ".wav", ".aac", ".ogg", ".opus",
@@ -33,12 +35,12 @@ FEED_EXTENSIONS = {".xml", ".rss", ".atom"}
 USER_AGENT = "podcast-reader/2.0 (+https://github.com/openai/codex)"
 
 
-def fetch(url: str, limit: int = 3_000_000, timeout: int = 25) -> tuple[bytes, str, str]:
+def fetch(url: str, limit: int = 3_000_000, timeout: int = 25, allow_private: bool = False) -> tuple[bytes, str, str]:
     request = urllib.request.Request(
         url,
         headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/xml, text/html, */*;q=0.5"},
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with safe_urlopen(request, timeout=timeout, allow_private=allow_private) as response:
         content_type = response.headers.get("Content-Type", "")
         final_url = response.geturl()
         data = response.read(limit + 1)
@@ -280,7 +282,7 @@ def parse_html(data: bytes, url: str) -> dict[str, Any]:
     return result
 
 
-def resolve_input(value: str, query: str | None = None, no_network: bool = False, latest: bool = False) -> dict[str, Any]:
+def resolve_input(value: str, query: str | None = None, no_network: bool = False, latest: bool = False, allow_private: bool = False) -> dict[str, Any]:
     value = value.strip()
     local = Path(value).expanduser()
     if local.exists():
@@ -318,7 +320,7 @@ def resolve_input(value: str, query: str | None = None, no_network: bool = False
         return {"kind": "web_url", "source_url": value, "next_action": "inspect public feed, transcript, and media metadata"}
 
     try:
-        data, content_type, final_url = fetch(value)
+        data, content_type, final_url = fetch(value, allow_private=allow_private)
         lowered = content_type.lower()
         if lowered.startswith(("audio/", "video/")):
             return {"kind": "media_url", "source_url": value, "canonical_url": final_url, "media_url": final_url, "content_type": content_type}
@@ -339,8 +341,9 @@ def main() -> int:
     parser.add_argument("--query", help="Episode title or GUID when input is a feed")
     parser.add_argument("--latest", action="store_true", help="Select the first feed item as latest")
     parser.add_argument("--no-network", action="store_true", help="Classify without fetching generic URLs")
+    parser.add_argument("--allow-private-network", action="store_true", help="Allow explicitly trusted local/private URL targets")
     args = parser.parse_args()
-    result = resolve_input(args.input, args.query, args.no_network, args.latest)
+    result = resolve_input(args.input, args.query, args.no_network, args.latest, args.allow_private_network)
     stream = sys.stderr if result.get("kind") in {"unknown", "unresolved"} else sys.stdout
     print(json.dumps(safe_output(result), ensure_ascii=False, indent=2), file=stream)
     return 2 if result.get("kind") == "unknown" else 1 if result.get("kind") == "unresolved" else 0

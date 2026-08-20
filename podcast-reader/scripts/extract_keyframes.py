@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from runtime_utils import atomic_write_json
+
 
 PTS_TIME = re.compile(r"pts_time:(\d+(?:\.\d+)?)")
 
@@ -132,7 +134,7 @@ def main() -> int:
         "note": "Frame observations are visual evidence and must not be represented as spoken claims.",
     }
     manifest_path = output_dir / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(manifest_path, manifest)
     print(json.dumps({"status": "ready", "manifest": str(manifest_path), "contact_sheet": manifest["contact_sheet"], "frame_count": len(entries), "warnings": warnings}, ensure_ascii=False, indent=2))
     return 0
 

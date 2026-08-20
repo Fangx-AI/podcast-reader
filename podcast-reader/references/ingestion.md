@@ -68,7 +68,7 @@ Use an available purpose-built YouTube transcript skill when it provides stronge
 ## Dependencies
 
 - Python 3.10+.
-- `yt-dlp`, or `uv` so the adapter can run yt-dlp ephemerally.
+- `yt-dlp`, or `uv` so the adapter can run the release-pinned yt-dlp version ephemerally without changing global packages.
 - FFmpeg/ffprobe for audio extraction, conversion, and visual sampling.
 - A transcription provider only when no transcript/caption exists.
 

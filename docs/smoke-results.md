@@ -1,4 +1,43 @@
-# v1.4.0 公开来源冒烟结果
+# v2.0.0 发布候选前向结果
+
+测试日期：2026-08-20（Asia/Shanghai）
+
+## FT-v2-01：本地分析闭环与安全分享
+
+- 输入：固定 SRT 夹具。
+- 结果：统一入口生成 transcript、SRT、VTT、检索索引、质量报告和当前 Agent 分析交接；黄金 `analysis.md` 与 `evidence.json` 通过短引、时间戳、segment 和枚举严格校验后，bundle 状态变为 `analyzed`。
+- 阅读器：自动生成可搜索、可键盘操作且时间戳可点击的 `reader.html`。
+- 分享：默认 ZIP 不含完整逐字稿和绝对本机路径；SHA-256 为 `fdc2d75eeba83675dc154257a5014eae080533b01d0a5155ebc97618cd0a9d1d`。
+
+## FT-v2-02：用户提供的 Bilibili 长视频
+
+- URL：<https://www.bilibili.com/video/BV1a5ECzqEVB/>
+- 模式：`subtitles`；不使用 Cookie、不下载 3 小时媒体。
+- 结果：成功读取标题、UP 主和 11,778.687 秒公开元数据；该页面当前不公开字幕，因此返回有效 `partial` bundle 和“提供公开 transcript 或授权本地媒体”的具体下一步。
+- 判断：受限状态不返回完成退出码，也不以登录、抓 Cookie 或规避平台控制换取假成功。下方 v1.4 长链路记录继续证明该来源在公开音频可用时的多分 P、切块与本地转写能力。
+
+## FT-v2-03：YouTube 单轨失败隔离
+
+- URL：<https://www.youtube.com/watch?v=arj7oStGLkU>
+- 首次观察：批量请求先碰 `zh-Hans` 自动轨时出现 HTTP 429，并错误隐藏可用人工字幕。
+- 发布前修复：改为“首选人工轨 → 源语言人工轨 → 自动轨”的逐轨回退，每次尝试后检查实际文件。
+- 真实复测：约 9.5 秒取得发布者 `zh-CN` VTT，生成 316 个带时间戳片段；质量检查 100 分、零警告，未下载音视频，状态 `ready_for_analysis`。
+
+## FT-v2-04：公开 RSS 最新一期
+
+- Feed：<https://feeds.npr.org/510289/podcast.xml>
+- 结果：解析 Planet Money 的 355 个条目，`--latest` 选择 `Getting entrepreneurial in Korea (Summer School)`，只保存元数据、不下载音频。
+- 校验：`metadata_only` bundle 结构、来源身份、artifact inventory 和下一步全部有效。
+
+## FT-v2-05：恢复、安装与发布门
+
+- 缓存：实际删除一个已生成音频块后复跑，系统报告 `chunk_file_missing_or_empty` 并事务式重建完整缓存。
+- 安装：全新 Skills 根目录安装、冲突保护、带版本备份更新、防降级和 rollback 均通过自动化及发布前向验证。
+- 发布：离线测试、编译、CLI `--help`、Skill 快速结构校验、SBOM、确定性 ZIP 与 SHA-256 必须同时通过后才创建 v2.0.0 标签。
+
+---
+
+# v1.4.0 历史公开来源冒烟结果
 
 测试日期：2026-08-19（Asia/Shanghai）
 

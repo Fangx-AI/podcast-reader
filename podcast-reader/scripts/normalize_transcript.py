@@ -13,6 +13,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from runtime_utils import atomic_write_json, atomic_write_text
+
 
 TIME_RANGE = re.compile(
     r"(?P<start>(?:\d{1,3}:)?\d{1,2}:\d{2}(?:[,.]\d{1,3})?)\s*-->\s*"
@@ -238,9 +240,12 @@ def deduplicate(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
         segment = dict(segment)
         segment["text"] = text
         if result and text == result[-1]["text"] and segment.get("speaker") == result[-1].get("speaker"):
-            if segment.get("end_seconds") is not None:
-                result[-1]["end_seconds"] = segment["end_seconds"]
-            continue
+            previous_end = result[-1].get("end_seconds")
+            current_start = segment.get("start_seconds")
+            if previous_end is None or current_start is None or current_start <= previous_end + 2:
+                if segment.get("end_seconds") is not None:
+                    result[-1]["end_seconds"] = segment["end_seconds"]
+                continue
         if result and segment.get("speaker") == result[-1].get("speaker") and text.startswith(result[-1]["text"]):
             previous_end = result[-1].get("end_seconds")
             current_start = segment.get("start_seconds")
@@ -312,7 +317,7 @@ def write_markdown(document: dict[str, Any], path: Path) -> None:
             prefix += f"**{speaker}:** "
         lines.append(prefix + item["text"])
         lines.append("")
-    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines).rstrip() + "\n")
 
 
 def write_srt(document: dict[str, Any], path: Path) -> bool:
@@ -327,7 +332,7 @@ def write_srt(document: dict[str, Any], path: Path) -> bool:
             end = timed[index]["start_seconds"] if index < len(timed) else start + 4
         label = f"{item['speaker']}: " if item.get("speaker") else ""
         lines.extend([str(index), f"{format_time(start, True, True)} --> {format_time(end, True, True)}", label + item["text"], ""])
-    path.write_text("\n".join(lines), encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines))
     return True
 
 
@@ -343,7 +348,7 @@ def write_vtt(document: dict[str, Any], path: Path) -> bool:
             end = timed[index + 1]["start_seconds"] if index + 1 < len(timed) else start + 4
         text = f"<v {item['speaker']}>{item['text']}</v>" if item.get("speaker") else item["text"]
         lines.extend([f"{format_time(start, True)} --> {format_time(end, True)}", text, ""])
-    path.write_text("\n".join(lines), encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines))
     return True
 
 
@@ -366,7 +371,7 @@ def main() -> int:
         raise ValueError("no transcript segments could be parsed")
     json_path = output_dir / "transcript.json"
     md_path = output_dir / "transcript.md"
-    json_path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(json_path, document)
     write_markdown(document, md_path)
     exports = {"json": str(json_path), "markdown": str(md_path)}
     if not args.no_subtitles:

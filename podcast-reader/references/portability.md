@@ -23,6 +23,8 @@ python "{skill_dir}/scripts/process_episode.py" <url-or-file> --output-root outp
 
 It uses the local adapter only when a public transcript is unavailable. Agents with a better native timestamped transcription capability may stop after acquisition and attach their own compliant JSON instead.
 
+`doctor.py` distinguishes `offline_ready` (dependencies already installed) from `bootstrap_ready` (the first run still needs network and downloads). Do not describe bootstrap capability as installed readiness.
+
 `scripts/transcribe_local.py` writes timestamped JSON compatible with the normalizer and chunk-combiner. It pins `faster-whisper==1.2.1` for repeatability.
 
 ```text
@@ -41,7 +43,7 @@ Recommended profiles:
 
 Local mode does not identify speakers. Preserve `speaker: null` or generic unknown labels. If speaker-aware analysis matters, prefer a host/provider with diarization or add a separately validated diarization lane.
 
-Per-chunk transcript files are resumable and reused by default. `--batch-size 4` is the long-form CPU starting point; reduce it on memory-constrained machines. Higher beam sizes can improve decoding at substantial cost and should not be the zero-config default for multi-hour media.
+Per-chunk transcript files are reused only after source fingerprints, decoding settings, JSON structure, and completion state match. Audio chunks overlap briefly at speech boundaries and are accepted only when ordered time ranges cover the full source. `--batch-size 4` is the long-form CPU starting point; reduce it on memory-constrained machines.
 
 ## Cross-Agent behavior
 

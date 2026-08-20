@@ -12,6 +12,9 @@ from typing import Any
 
 from prepare_episode import artifact_inventory
 from validate_notes import validate as validate_notes
+from runtime_utils import atomic_write_json
+from evidence_validator import validate_evidence
+from render_reader import render as render_reader
 
 
 def load_json(path: Path) -> Any:
@@ -44,6 +47,7 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
         "bundle_exists": bundle_path.is_file(),
         "transcript_exists": transcript_path.is_file(),
         "analysis_exists": analysis_path.is_file(),
+        "evidence_exists": evidence_path.is_file(),
     }
     if not all(checks.values()):
         missing = [name for name, passed in checks.items() if not passed]
@@ -53,13 +57,13 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
     transcript = load_json(transcript_path)
     errors: list[str] = []
 
-    analysis_result = validate_notes(analysis_path, strict=True)
+    analysis_result = validate_notes(analysis_path, strict=True, transcript_path=transcript_path)
     checks["analysis_strict"] = bool(analysis_result["valid"])
     if not checks["analysis_strict"]:
         errors.extend(f"analysis:{failure}" for failure in analysis_result["failures"])
 
     if summary_path.is_file():
-        summary_result = validate_notes(summary_path, strict=True)
+        summary_result = validate_notes(summary_path, strict=True, transcript_path=transcript_path)
         checks["summary_strict"] = bool(summary_result["valid"])
         if not checks["summary_strict"]:
             errors.extend(f"summary:{failure}" for failure in summary_result["failures"])
@@ -67,18 +71,13 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
     if evidence_path.is_file():
         try:
             evidence = load_json(evidence_path)
-            segment_ids = {
-                int(segment["segment_id"])
-                for segment in transcript.get("segments", [])
-                if isinstance(segment, dict) and isinstance(segment.get("segment_id"), int)
-            }
-            missing_ids = sorted(evidence_segment_ids(evidence) - segment_ids)
-            checks["evidence_json"] = isinstance(evidence, dict) and evidence.get("schema_version") == "1.0"
-            checks["evidence_references"] = not missing_ids
-            if not checks["evidence_json"]:
-                errors.append("evidence:invalid_schema")
-            if missing_ids:
-                errors.append(f"evidence:missing_segment_ids:{','.join(map(str, missing_ids))}")
+            evidence_result = validate_evidence(evidence, transcript)
+            checks["evidence_json"] = isinstance(evidence, dict) and evidence.get("schema_version") in {"1.0", "2.0"}
+            checks["evidence_references"] = bool(evidence_result["valid"])
+            checks["evidence_quotes_exact"] = not any("quote text" in item for item in evidence_result["errors"])
+            if not evidence_result["valid"]:
+                errors.extend(f"evidence:{item}" for item in evidence_result["errors"])
+            bundle["quality_metrics"] = evidence_result.get("metrics", {})
         except (OSError, ValueError, TypeError) as exc:
             checks["evidence_json"] = False
             checks["evidence_references"] = False
@@ -87,15 +86,23 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
     if errors:
         return {"episode_dir": str(episode_dir), "checks": checks, "errors": errors, "valid": False}
 
+    try:
+        reader_result = render_reader(episode_dir, episode_dir / "reader.html")
+        checks["reader_rendered"] = reader_result.get("status") == "rendered"
+    except Exception as exc:
+        checks["reader_rendered"] = False
+        return {"episode_dir": str(episode_dir), "checks": checks, "errors": [f"reader:{exc}"], "valid": False}
+
     bundle["status"] = "analyzed"
     bundle["updated_at"] = datetime.now(timezone.utc).isoformat()
+    bundle["completed_at"] = bundle["updated_at"]
     bundle["artifacts"] = artifact_inventory(episode_dir)
     bundle["next_actions"] = ["answer questions using chunks.json"]
     if evidence_path.is_file():
         bundle["next_actions"].append("export evidence.json collections to CSV when requested")
     else:
         bundle["next_actions"].append("create evidence.json when structured evidence or CSV export is requested")
-    bundle_path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(bundle_path, bundle)
 
     checks["bundle_updated"] = True
     return {

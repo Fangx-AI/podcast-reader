@@ -1,4 +1,4 @@
-# Podcast Reader v1.4.0
+# Podcast Reader v2.0.0
 
 Podcast Reader turns a public podcast or long-video link into a reusable, timestamp-grounded research bundle.
 
@@ -46,6 +46,8 @@ python podcast-reader/scripts/process_episode.py <url-or-file>
 ```
 
 The unified entrypoint prefers public transcripts, acquires media only when needed, resumes completed chunks, emits visible stage progress, and produces a timestamped transcript plus retrieval index.
+
+v2 also emits an Agent-facing analysis contract, validates quotes and claims against exact transcript segments before declaring completion, renders a standalone searchable reader, and creates privacy-safe share archives. Translation and speaker diarization are capability adapters rather than mandatory vendor APIs, so the core Skill remains portable across Agents.
 
 The user-facing Chinese documentation in [README.md](README.md) contains the complete feature matrix, CLI examples, architecture, output bundle, quality policy, and safety model. See [docs/architecture.md](docs/architecture.md), [docs/quality-and-acceptance.md](docs/quality-and-acceptance.md), and [podcast-reader/references/portability.md](podcast-reader/references/portability.md) for engineering details.
 

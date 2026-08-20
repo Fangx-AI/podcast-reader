@@ -12,6 +12,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from runtime_utils import safe_urlopen, validate_public_http_url
+
 
 MEDIA_EXTENSIONS = {".mp3", ".m4a", ".mp4", ".wav", ".aac", ".ogg", ".opus", ".flac", ".webm"}
 USER_AGENT = "podcast-reader/2.0"
@@ -48,11 +50,15 @@ def main() -> int:
     parser.add_argument("--name", help="Base filename without extension")
     parser.add_argument("--max-mb", type=int, default=2048, help="Maximum download size; 0 disables")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--allow-private-network", action="store_true", help="Allow loopback/private targets for explicitly trusted local testing")
     args = parser.parse_args()
 
     parsed = urllib.parse.urlparse(args.url)
-    if parsed.scheme not in {"http", "https"}:
-        raise ValueError("only http(s) URLs are supported")
+    try:
+        validate_public_http_url(args.url, args.allow_private_network)
+    except ValueError as exc:
+        print(json.dumps({"status": "blocked", "stage": "security", "source_url": public_source_url(args.url), "error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
+        return 1
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     request = urllib.request.Request(args.url, headers={"User-Agent": USER_AGENT, "Accept": "audio/*,video/*;q=0.8,*/*;q=0.1"})
@@ -61,7 +67,7 @@ def main() -> int:
     target: Path | None = None
     partial: Path | None = None
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with safe_urlopen(request, timeout=60, allow_private=args.allow_private_network) as response:
             content_type = response.headers.get("Content-Type", "")
             media_type = content_type.split(";", 1)[0].strip().lower()
             if media_type.startswith("text/") or media_type in {"application/json", "application/xml", "application/xhtml+xml"}:

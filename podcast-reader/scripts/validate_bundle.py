@@ -8,6 +8,9 @@ import json
 import sys
 from pathlib import Path
 
+from evidence_validator import validate_evidence
+from validate_notes import validate as validate_notes
+
 
 READY_STATUSES = {"ready", "ready_for_analysis", "analyzed"}
 
@@ -73,6 +76,28 @@ def validate(episode_dir: Path) -> dict:
             errors.append("chunks.json has invalid or empty chunks")
         if isinstance(transcript, dict) and chunks.get("segment_count") != transcript.get("segment_count"):
             warnings.append("chunk index segment_count differs from transcript")
+
+    if bundle.get("status") == "analyzed":
+        for name in ("analysis.md", "evidence.json", "reader.html"):
+            checks[f"analyzed_{name}_exists"] = (episode_dir / name).is_file()
+            if not checks[f"analyzed_{name}_exists"]:
+                errors.append(f"analyzed bundle is missing {name}")
+        if isinstance(transcript, dict) and (episode_dir / "analysis.md").is_file():
+            report_result = validate_notes(episode_dir / "analysis.md", strict=True, transcript_path=transcript_path)
+            checks["analysis_grounded"] = report_result["valid"]
+            errors.extend(f"analysis: {item}" for item in report_result["failures"])
+        if isinstance(transcript, dict) and (episode_dir / "evidence.json").is_file():
+            evidence = read_json(episode_dir / "evidence.json", errors)
+            evidence_result = validate_evidence(evidence, transcript)
+            checks["evidence_grounded"] = evidence_result["valid"]
+            errors.extend(f"evidence: {item}" for item in evidence_result["errors"])
+
+    chunk_manifest_path = episode_dir / "audio-chunks" / "audio-chunks.json"
+    if chunk_manifest_path.is_file():
+        manifest = read_json(chunk_manifest_path, errors)
+        checks["chunk_manifest_complete"] = isinstance(manifest, dict) and manifest.get("schema_version") == "2.0" and manifest.get("status") == "complete"
+        if not checks["chunk_manifest_complete"]:
+            errors.append("audio chunk manifest is legacy, invalid, or incomplete")
 
     inventory = bundle.get("artifacts")
     checks["artifact_inventory"] = isinstance(inventory, dict)

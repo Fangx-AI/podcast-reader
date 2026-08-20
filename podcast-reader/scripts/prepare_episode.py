@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from resolve_podcast import resolve_input
+from runtime_utils import atomic_write_json, safe_urlopen
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -129,11 +130,11 @@ def choose_subtitle(paths: list[str], language_order: list[str]) -> Path | None:
     return sorted(candidates, key=score)[0]
 
 
-def download_text(url: str, target: Path, max_bytes: int = 20_000_000) -> Path:
+def download_text(url: str, target: Path, max_bytes: int = 20_000_000, allow_private: bool = False) -> Path:
     request = urllib.request.Request(url, headers={"User-Agent": "podcast-reader/2.0", "Accept": "text/*,application/json,application/xml;q=0.8,*/*;q=0.1"})
     partial = target.with_suffix(target.suffix + ".part")
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with safe_urlopen(request, timeout=60, allow_private=allow_private) as response:
             content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
             if content_type in {"text/html", "application/xhtml+xml"}:
                 raise ValueError(f"transcript URL returned a webpage instead of transcript data: {content_type}")
@@ -168,7 +169,7 @@ def ensure_source_record(episode_dir: Path, source_input: str, resolution: dict[
         "title": (resolution.get("episode") or {}).get("title") if isinstance(resolution.get("episode"), dict) else resolution.get("title"),
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
     }
-    target.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(target, record)
 
 
 def artifact_inventory(episode_dir: Path) -> dict[str, list[str]]:
@@ -247,9 +248,9 @@ def write_bundle(episode_dir: Path, source_input: str, resolution: dict[str, Any
         "provenance_note": "Raw acquired material, normalized transcript, generated analysis, and external verification must remain distinguishable.",
     }
     path = episode_dir / "bundle.json"
-    path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(path, bundle)
     bundle["artifacts"] = artifact_inventory(episode_dir)
-    path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(path, bundle)
     return bundle
 
 
@@ -265,6 +266,7 @@ def main() -> int:
     parser.add_argument("--transcript", help="Attach a completed transcript to this source bundle without reacquiring media")
     parser.add_argument("--transcript-method", default="generated", help="Provenance label for --transcript")
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--allow-private-network", action="store_true", help="Allow explicitly trusted local/private URL targets")
     args = parser.parse_args()
 
     # Transcript attachment is a local resume operation. Reuse the existing
@@ -276,7 +278,7 @@ def main() -> int:
             cached_bundle = json.loads(cached_bundle_path.read_text(encoding="utf-8-sig"))
             if cached_bundle.get("bundle_id") == source_key(args.input) and isinstance(cached_bundle.get("resolution"), dict):
                 cached_resolution = cached_bundle["resolution"]
-    resolution = cached_resolution or resolve_input(args.input, args.query, no_network=False, latest=args.latest)
+    resolution = cached_resolution or resolve_input(args.input, args.query, no_network=False, latest=args.latest, allow_private=args.allow_private_network)
     output_root = Path(args.output_root).expanduser().resolve()
     episode_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else derive_episode_dir(output_root, args.input, resolution)
     episode_dir.mkdir(parents=True, exist_ok=True)
@@ -322,7 +324,7 @@ def main() -> int:
             next_actions = ["analyze transcript", "answer questions using chunks.json"]
     elif kind == "local_media":
         source_record = {"kind": kind, "path": resolution["path"], "retrieved_at": datetime.now(timezone.utc).isoformat()}
-        (episode_dir / "source.json").write_text(json.dumps(source_record, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(episode_dir / "source.json", source_record)
         status, transcript_status = "needs_transcription", "unavailable"
         next_actions = [f"transcribe local media: {resolution['path']}", "attach it with --transcript after transcription"]
     elif kind in {"youtube", "bilibili"}:
@@ -363,7 +365,7 @@ def main() -> int:
                 suffix = Path(parsed.path).suffix.lower()
                 suffix = suffix if suffix in TRANSCRIPT_EXTENSIONS else ".txt"
                 try:
-                    raw = download_text(transcript_urls[0], episode_dir / f"transcript-raw{suffix}")
+                    raw = download_text(transcript_urls[0], episode_dir / f"transcript-raw{suffix}", allow_private=args.allow_private_network)
                     if normalize_and_index(raw, episode_dir, None, "publisher_transcript", warnings):
                         status, transcript_status = "ready_for_analysis", "normalized"
                         next_actions = ["analyze transcript", "answer questions using chunks.json"]
@@ -371,7 +373,10 @@ def main() -> int:
                     warnings.append({"stage": "transcript_download", "message": str(exc)})
             should_fetch_audio = args.mode in {"audio", "all"} or (args.mode == "auto" and status != "ready_for_analysis")
             if should_fetch_audio and episode.get("audio_url"):
-                code, result, diagnostic = run_script("fetch_audio.py", [episode["audio_url"], "--output-dir", str(episode_dir), "--name", slugify(episode.get("title") or "episode")])
+                fetch_args = [episode["audio_url"], "--output-dir", str(episode_dir), "--name", slugify(episode.get("title") or "episode")]
+                if args.allow_private_network:
+                    fetch_args.append("--allow-private-network")
+                code, result, diagnostic = run_script("fetch_audio.py", fetch_args)
                 if code == 0:
                     if status != "ready_for_analysis":
                         status, transcript_status = "needs_transcription", "unavailable"
@@ -387,7 +392,10 @@ def main() -> int:
             status = "metadata_only" if args.mode == "metadata" else "partial"
             next_actions = ["rerun in auto/audio mode to acquire media for transcription"]
         else:
-            code, result, diagnostic = run_script("fetch_audio.py", [media_url, "--output-dir", str(episode_dir)])
+            fetch_args = [media_url, "--output-dir", str(episode_dir)]
+            if args.allow_private_network:
+                fetch_args.append("--allow-private-network")
+            code, result, diagnostic = run_script("fetch_audio.py", fetch_args)
             if code == 0:
                 status, transcript_status = "needs_transcription", "unavailable"
                 next_actions = [f"transcribe acquired media: {result.get('path')}", "attach it with --transcript after transcription"]
@@ -404,7 +412,7 @@ def main() -> int:
             parsed = urllib.parse.urlparse(transcript_urls[0])
             suffix = Path(parsed.path).suffix.lower() if Path(parsed.path).suffix.lower() in TRANSCRIPT_EXTENSIONS else ".txt"
             try:
-                raw = download_text(transcript_urls[0], episode_dir / f"transcript-raw{suffix}")
+                raw = download_text(transcript_urls[0], episode_dir / f"transcript-raw{suffix}", allow_private=args.allow_private_network)
                 if normalize_and_index(raw, episode_dir, None, "publisher_transcript", warnings):
                     status, transcript_status = "ready_for_analysis", "normalized"
                     next_actions = ["analyze transcript", "answer questions using chunks.json"]
@@ -412,7 +420,10 @@ def main() -> int:
                 warnings.append({"stage": "transcript_download", "message": str(exc)})
         should_fetch_audio = args.mode in {"audio", "all"} or (args.mode == "auto" and status != "ready_for_analysis")
         if should_fetch_audio and len(audio_urls) == 1:
-            code, result, diagnostic = run_script("fetch_audio.py", [audio_urls[0], "--output-dir", str(episode_dir)])
+            fetch_args = [audio_urls[0], "--output-dir", str(episode_dir)]
+            if args.allow_private_network:
+                fetch_args.append("--allow-private-network")
+            code, result, diagnostic = run_script("fetch_audio.py", fetch_args)
             if code == 0:
                 if status != "ready_for_analysis":
                     status, transcript_status = "needs_transcription", "unavailable"

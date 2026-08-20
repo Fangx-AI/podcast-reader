@@ -21,11 +21,14 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from runtime_utils import atomic_write_json, atomic_write_text, safe_urlopen, validate_public_http_url
+
 
 SUBTITLE_EXTENSIONS = {".vtt", ".srt", ".ass", ".lrc", ".ttml", ".json3"}
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav", ".aac", ".ogg", ".opus", ".flac"}
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".webm"}
 MEDIA_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
+YTDLP_SPEC = "yt-dlp==2026.08.19"
 CONTROL_FILES = {"bundle.json", "source.json", "source-info.json", "ingest-result.json"}
 BILIBILI_ID = re.compile(r"/(?:video/)?(?P<id>BV[0-9A-Za-z]+|av\d+)", re.I)
 SENSITIVE_QUERY = re.compile(r"(?:token|sig(?:nature)?|auth|secret|session|jwt|key|policy|expires?|credential|hdnea)", re.I)
@@ -41,7 +44,7 @@ def resolve_ytdlp() -> tuple[list[str] | None, str]:
         return [installed], "installed"
     uv = command("uv")
     if uv:
-        return [uv, "run", "--with", "yt-dlp", "yt-dlp"], "uv-ephemeral"
+        return [uv, "run", "--with", YTDLP_SPEC, "yt-dlp"], "uv-ephemeral-pinned"
     return None, "missing"
 
 
@@ -127,9 +130,75 @@ def compact_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _requested_subtitle_languages(value: str) -> list[str]:
+    """Return concrete language preferences, excluding yt-dlp selectors."""
+    return [
+        item.strip() for item in value.split(",")
+        if item.strip() and item.strip().lower() != "all" and not item.strip().startswith("-")
+    ]
+
+
+def _language_match_score(available: str, requested: str) -> tuple[int, str]:
+    """Rank exact, script-compatible, then base-language subtitle matches."""
+    left = available.casefold().replace("_", "-")
+    right = requested.casefold().replace("_", "-")
+    if left == right:
+        return (0, left)
+    simplified = {"zh-cn", "zh-hans", "zh-sg"}
+    traditional = {"zh-tw", "zh-hant", "zh-hk", "zh-mo"}
+    if left in simplified and right in simplified:
+        return (1, left)
+    if left in traditional and right in traditional:
+        return (1, left)
+    if left.split("-", 1)[0] == right.split("-", 1)[0]:
+        return (2, left)
+    return (99, left)
+
+
+def subtitle_download_candidates(metadata: dict[str, Any], requested_spec: str) -> list[tuple[str, str]]:
+    """Build bounded, reliable subtitle fallbacks.
+
+    Publisher-provided tracks are preferred over automatic captions. The first
+    requested language is attempted first, followed immediately by the source
+    language so a throttled translation track cannot hide a usable original.
+    """
+    requested = _requested_subtitle_languages(requested_spec)
+    source_language = str(metadata.get("language") or "").strip()
+    target_order: list[str] = []
+    if requested:
+        target_order.append(requested[0])
+    if source_language and source_language.casefold() not in {item.casefold() for item in target_order}:
+        target_order.append(source_language)
+    target_order.extend(
+        item for item in requested
+        if item.casefold() not in {existing.casefold() for existing in target_order}
+    )
+
+    human = [str(item) for item in (metadata.get("subtitles") or {}) if str(item).lower() != "live_chat"]
+    automatic = [str(item) for item in (metadata.get("automatic_captions") or {}) if str(item).lower() != "live_chat"]
+    result: list[tuple[str, str]] = []
+    used: set[tuple[str, str]] = set()
+
+    def add_best(kind: str, available: list[str], targets: list[str]) -> None:
+        for target in targets:
+            ranked = sorted((_language_match_score(item, target), item) for item in available)
+            if not ranked or ranked[0][0][0] >= 99:
+                continue
+            candidate = (ranked[0][1], kind)
+            marker = (candidate[0].casefold(), kind)
+            if marker not in used:
+                result.append(candidate)
+                used.add(marker)
+
+    add_best("human", human, target_order)
+    auto_targets = ([source_language] if source_language else []) + target_order
+    add_best("automatic", automatic, auto_targets)
+    return result[:16]
+
+
 def fetch_json(url: str, referer: str) -> dict[str, Any]:
     request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 podcast-reader/2.0", "Referer": referer, "Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=25) as response:
+    with safe_urlopen(request, timeout=25) as response:
         return json.load(response)
 
 
@@ -295,7 +364,7 @@ def write_bilibili_subtitles(tracks: list[dict[str, Any]], output_dir: Path, sou
         if len(lines) > 2:
             language = re.sub(r"[^A-Za-z0-9_-]+", "-", str(track.get("lan") or "unknown"))
             target = output_dir / f"bilibili-{video_id}.{language}.vtt"
-            target.write_text("\n".join(lines), encoding="utf-8")
+            atomic_write_text(target, "\n".join(lines))
             written.append(str(target.resolve()))
     return written
 
@@ -308,7 +377,7 @@ def common_args(cookies_from_browser: str | None) -> list[str]:
 
 
 def write_result(output_dir: Path, result: dict[str, Any]) -> None:
-    (output_dir / "ingest-result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(output_dir / "ingest-result.json", result)
 
 
 def main() -> int:
@@ -322,6 +391,7 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="Allow yt-dlp to overwrite existing acquired files")
     parser.add_argument("--cookies-from-browser", help="Explicit authorized yt-dlp browser cookie source; never set automatically")
     args = parser.parse_args()
+    validate_public_http_url(args.input)
 
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -334,7 +404,7 @@ def main() -> int:
             "size_bytes": local.stat().st_size,
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
         }
-        (output_dir / "source.json").write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(output_dir / "source.json", source)
         local_path = str(local.resolve())
         local_video = [local_path] if local.suffix.lower() in VIDEO_EXTENSIONS else []
         local_audio = [local_path] if local.suffix.lower() in AUDIO_EXTENSIONS else []
@@ -393,8 +463,8 @@ def main() -> int:
         "ingestion_adapter": f"yt-dlp:{adapter}",
         "cookie_mode": "explicit" if args.cookies_from_browser else "none",
     }
-    (output_dir / "source.json").write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding="utf-8")
-    (output_dir / "source-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(output_dir / "source.json", source)
+    atomic_write_json(output_dir / "source-info.json", info)
 
     warnings: list[dict[str, str]] = [metadata_warning] if metadata_warning else []
     template = "%(title).180B [%(id)s].%(ext)s"
@@ -410,14 +480,31 @@ def main() -> int:
         elif using_bilibili_public_api:
             warnings.append({"stage": "subtitles", "message": "publisher exposes no public subtitle tracks"})
         else:
-            subtitle_cmd = base + overwrite + [
-                "--skip-download", "--write-subs", "--write-auto-subs",
-                "--sub-langs", args.sub_langs, "--sub-format", "vtt/srt/best",
-                "--restrict-filenames", "-o", template, args.input,
-            ]
-            subtitle_run = run(subtitle_cmd, output_dir)
-            if subtitle_run.returncode != 0:
-                warnings.append({"stage": "subtitles", "message": tail(subtitle_run.stderr or subtitle_run.stdout)})
+            candidates = subtitle_download_candidates(raw_metadata, args.sub_langs)
+            subtitle_failures: list[str] = []
+            if not classify_files(output_dir)["subtitles"]:
+                for language, track_kind in candidates:
+                    write_flag = "--write-subs" if track_kind == "human" else "--write-auto-subs"
+                    subtitle_cmd = base + overwrite + [
+                        "--skip-download", write_flag, "--sub-langs", language,
+                        "--sub-format", "vtt/srt/best", "--restrict-filenames",
+                        "-o", template, args.input,
+                    ]
+                    subtitle_run = run(subtitle_cmd, output_dir)
+                    if classify_files(output_dir)["subtitles"]:
+                        if subtitle_failures:
+                            warnings.append({
+                                "stage": "subtitles",
+                                "message": f"subtitle fallback succeeded with {track_kind} track {language}; "
+                                f"earlier attempts failed: {' | '.join(subtitle_failures)}",
+                            })
+                        break
+                    failure = tail(subtitle_run.stderr or subtitle_run.stdout) or "no subtitle file produced"
+                    subtitle_failures.append(f"{track_kind}:{language}: {failure}")
+            if not classify_files(output_dir)["subtitles"]:
+                if not candidates:
+                    subtitle_failures.append("metadata advertised no matching subtitle tracks")
+                warnings.append({"stage": "subtitles", "message": " | ".join(subtitle_failures)})
 
     files = classify_files(output_dir)
     want_audio = args.mode in {"audio", "all"} or (args.mode == "auto" and not files["subtitles"])

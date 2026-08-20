@@ -14,9 +14,13 @@ Human-readable output is Markdown. JSON is the canonical interchange format for 
 ├── transcript.md             # readable transcript
 ├── transcript.srt/.vtt       # subtitle exports when timed
 ├── chunks.json               # retrieval index
+├── transcript-quality.json   # deterministic quality metrics and spot-check queue
+├── analysis-handoff.json     # provider-neutral current-Agent completion contract
 ├── analysis.md               # polished analysis
 ├── summary.md                # optional standalone summary
 ├── evidence.json             # claims/chapters/quotes/actions/entities/glossary
+├── reader.html               # accessible searchable reader with seek links
+├── translations/             # timestamp-preserving translated JSON/MD/SRT/VTT
 ├── *.csv                     # optional table exports
 └── frames/                   # optional visual lane
     ├── manifest.json
@@ -30,7 +34,7 @@ Human-readable output is Markdown. JSON is the canonical interchange format for 
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "method": "publisher_transcript|human_captions|platform_captions|automatic_captions|generated|user_provided",
   "language": "zh-CN",
   "segment_count": 2,
@@ -56,7 +60,7 @@ Human-readable output is Markdown. JSON is the canonical interchange format for 
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "episode": {
     "title": "",
     "show": "",
@@ -79,7 +83,7 @@ Human-readable output is Markdown. JSON is the canonical interchange format for 
       "evidence": [{"start": "00:00:00", "end": "00:00:00", "segment_ids": [1], "label": "transcript indicates"}]
     }
   ],
-  "quotes": [{"text": "", "speaker": null, "start": "00:00:00", "end": "00:00:00"}],
+  "quotes": [{"text": "", "speaker": null, "start": "00:00:00", "end": "00:00:00", "segment_ids": [1]}],
   "actions": [{"action": "", "for_whom": "", "prerequisites": [], "risks": [], "evidence": []}],
   "entities": [{"name": "", "type": "person|organization|product|book|paper|concept|tool", "context": "", "evidence": []}],
   "glossary": [{"source_term": "", "preferred_term": "", "type": "", "note": "", "evidence": []}],
@@ -88,7 +92,7 @@ Human-readable output is Markdown. JSON is the canonical interchange format for 
 }
 ```
 
-All non-empty evidence references must resolve to a transcript segment or sampled visual frame.
+All claim/action/entity evidence references must resolve to transcript segments. Quote text must be an exact substring of the referenced transcript window; timestamps must be ordered and remain within transcript duration. Chapters must be chronologically ordered and non-overlapping.
 
 ## Markdown design rules
 

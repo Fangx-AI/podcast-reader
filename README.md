@@ -1,4 +1,4 @@
-# Podcast Reader v1.4.0
+# Podcast Reader v2.0.0
 
 把一个播客或长视频链接，变成可检索、可追问、可核验、可复用的研究资料包。
 
@@ -15,7 +15,9 @@
 - **可以持续追问**：节目只处理一次，后续问题检索本地 `chunks.json`，自动利用 `evidence.json` 的双语术语和主张证据，不会重复下载或转写。
 - **适合真正的长内容**：分块索引，不把数小时文本一次性塞进上下文。
 - **不忽略画面**：视频里的幻灯片、图表、代码和演示可以走独立画面证据链。
-- **多语言友好**：保留原文，按用户语言分析，时间戳、说话人和术语表不丢失。
+- **多语言友好**：保留原文；任意目标语言通过 Agent/提供商中立的逐段翻译契约生成，时间戳和术语表不丢失。
+- **真正可恢复**：来源指纹、连续块、时长覆盖和转写参数全部校验；损坏缓存隔离后重建，不会静默漏掉后半段。
+- **分享默认安全**：分享包净化本机路径和敏感 URL 参数，默认不携带完整逐字稿。
 - **失败也有结果**：每个阶段都会留下状态、已有文件、明确原因和下一步。
 
 ## 30 秒开始
@@ -71,7 +73,7 @@ flowchart LR
     B --> C{有公开字幕或稿件?}
     C -->|有| D[标准化转录]
     C -->|无| E[获取音频]
-    E --> F[转写与说话人区分]
+    E --> F[转写与可插拔说话人标注]
     F --> D
     D --> G[时间戳分块索引]
     G --> H[快速 / 标准 / 深度分析]
@@ -116,8 +118,12 @@ episode/
 ├── transcript.srt/.vtt    # 字幕格式
 ├── chunks.json            # 持续问答检索索引
 ├── progress.json          # 最近一次处理的阶段、状态和说明
+├── transcription-progress.json # 分块百分比、耗时、ETA、部分可用状态
+├── transcript-quality.json # 转录质量指标与抽查建议
+├── analysis-handoff.json  # 当前 Agent 的分析完成契约
 ├── analysis.md            # 精美分析报告
 ├── evidence.json          # 主张、章节、短引、行动和实体
+├── reader.html            # 可搜索、可点击时间戳的无障碍阅读器
 ├── *.csv                  # 可选表格导出
 └── frames/                # 可选视频画面证据
 ```
@@ -164,6 +170,15 @@ python podcast-reader/scripts/extract_keyframes.py video.mp4 --output-dir episod
 python podcast-reader/scripts/finalize_bundle.py episode
 python podcast-reader/scripts/validate_bundle.py episode
 python podcast-reader/scripts/validate_notes.py episode/analysis.md --strict
+
+# 隐私安全分享、存储清理和交互式阅读器
+python podcast-reader/scripts/export_bundle.py episode --profile share
+python podcast-reader/scripts/cleanup_bundle.py episode --scope cache
+python podcast-reader/scripts/render_reader.py episode
+
+# 任意目标语言翻译与提供商中立说话人时间段回填
+python podcast-reader/scripts/translate_transcript.py episode/transcript.json --target-language zh-CN
+python podcast-reader/scripts/apply_diarization.py episode/transcript.json speaker-turns.json
 ```
 
 ## 依赖
@@ -179,7 +194,7 @@ python podcast-reader/scripts/validate_notes.py episode/analysis.md --strict
 
 项目包含：
 
-- 38 个离线单元、契约与端到端场景；
+- 51+ 个离线单元、契约、安全、恢复与端到端场景；
 - RSS、HTML、SRT、VTT 和黄金 Markdown 固定样例；
 - 所有 CLI 的 `--help` 接口测试；
 - Skill frontmatter、渐进披露和文档链接检查；
@@ -194,7 +209,7 @@ python -m unittest discover -s podcast-reader/tests -v
 python -m compileall -q podcast-reader/scripts
 ```
 
-更详细的设计见 [架构说明](docs/architecture.md)，同类项目对照见 [竞品与顶级 Skill 基准](docs/benchmark.md)，验收范围见 [质量与验收](docs/quality-and-acceptance.md)，真实平台结果见 [公开来源冒烟报告](docs/smoke-results.md)，当前用户体验证据见 [验收矩阵](docs/ux-acceptance.md)，版本交付见 [v1.4.0 发布说明](docs/release-v1.4.0.md)。
+更详细的设计见 [架构说明](docs/architecture.md)，同类项目对照见 [竞品与顶级 Skill 基准](docs/benchmark.md)，验收范围见 [质量与验收](docs/quality-and-acceptance.md)，真实平台结果见 [公开来源冒烟报告](docs/smoke-results.md)，当前用户体验证据见 [验收矩阵](docs/ux-acceptance.md)，版本交付见 [v2.0.0 发布说明](docs/release-v2.0.0.md)。
 
 ## 安全与版权
 

@@ -25,7 +25,7 @@ Return available artifacts plus a precise stage and next action. Do not collapse
 python "{skill_dir}/scripts/doctor.py" --json
 ```
 
-The doctor is the preferred first check: it performs no downloads or network requests and reports which workflows are ready, degraded, or blocked. Use individual commands only when diagnosing one binary:
+The doctor is the preferred first check: it performs no downloads or network requests and reports `offline_ready`, `bootstrap_ready`, `core_only`, or `blocked`. A bootstrap-ready result still means the first real run may download dependencies/model weights. Use individual commands only when diagnosing one binary:
 
 ```text
 python --version
@@ -45,6 +45,8 @@ The adapter uses installed `yt-dlp` first, then an ephemeral `uv` copy. Updating
 - `metadata_only` — metadata was requested or content acquisition was intentionally skipped.
 - `partial` — some useful artifacts exist; read warnings/next actions.
 - `blocked` — no safe path can continue without a different source, authorization, or dependency.
+
+`process_episode.py` exits `3` when a usable state exists but selection, Agent work, or another action is still required; it exits `2` when blocked or failed. Only ready/analyzed preparation states use exit `0`.
 
 ## Recovery discipline
 

@@ -33,7 +33,7 @@
 
 ## 精选短引
 
-> “The key is reliable evaluation.” — 嘉宾 `[00:00:06]`
+> “The key is reliable evaluation, not just a bigger model.” — 嘉宾 `[00:00:06]`
 
 ## 不确定性与限制
 

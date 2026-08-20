@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>示例播客</title>
+    <item>
+      <title>第一期：证据与产品</title>
+      <guid>episode-001</guid>
+      <pubDate>Tue, 18 Aug 2026 08:00:00 GMT</pubDate>
+      <enclosure url="https://cdn.example.com/episode-001.mp3" type="audio/mpeg" length="12345" />
+      <podcast:transcript url="https://cdn.example.com/episode-001.vtt" type="text/vtt" />
+      <description><![CDATA[本期讨论证据驱动的产品设计。]]></description>
+    </item>
+    <item>
+      <title>第二期：系统设计</title>
+      <guid>episode-002</guid>
+      <enclosure url="https://cdn.example.com/episode-002.mp3" type="audio/mpeg" />
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-label="Podcast Reader">
+  <rect x="4" y="4" width="88" height="88" rx="24" fill="#6D5EF7"/>
+  <path d="M28 34a20 20 0 0 1 40 0v24a8 8 0 0 1-8 8h-6V44h12V34a18 18 0 0 0-36 0v10h12v22h-6a8 8 0 0 1-8-8V34Z" fill="#fff"/>
+  <path d="M42 72h12v6H42z" fill="#FFD166"/>
+  <text x="112" y="45" font-family="Segoe UI,Arial,sans-serif" font-size="29" font-weight="700" fill="#1D1833">Podcast Reader</text>
+  <text x="112" y="70" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#625D72">Long-form media, grounded in evidence</text>
+</svg>

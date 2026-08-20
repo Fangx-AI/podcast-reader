@@ -1,0 +1,7 @@
+interface:
+  display_name: "Podcast Reader"
+  short_description: "Turn podcast and long-video links into cited research"
+  icon_small: "./assets/icon-small.svg"
+  icon_large: "./assets/icon-large.svg"
+  brand_color: "#6D5EF7"
+  default_prompt: "Use $podcast-reader on this link or file. Reuse any existing episode bundle; otherwise acquire public captions or audio, build a timestamped searchable transcript, analyze it in my language, answer with evidence, and export a polished Markdown report."

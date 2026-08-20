@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible source, processing, or output problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include cookies, API keys, private feed tokens, signed media URLs, or copyrighted full transcripts.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Failing stage
+      options: [resolve, metadata, subtitles, media, transcription, normalization, indexing, visual, analysis, export, validation]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Include a public URL or redistributable fixture and the exact command/request.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python, yt-dlp, FFmpeg, and relevant warnings from bundle.json.
+    validations:
+      required: true

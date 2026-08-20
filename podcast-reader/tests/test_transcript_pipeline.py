@@ -37,6 +37,39 @@ class TranscriptPipelineTests(unittest.TestCase):
             self.assertEqual(data["segment_count"], 2)
             self.assertEqual(data["segments"][1]["end"], "00:00:10")
 
+    def test_search_uses_evidence_glossary_for_cross_language_query(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "chunks.json").write_text(json.dumps({
+                "schema_version": "1.0",
+                "chunks": [{"chunk_id": 0, "start": "00:00:01", "end": "00:00:05", "text": "Attention is the real currency of life.", "search_text": "attention is the real currency of life"}],
+            }), encoding="utf-8")
+            (root / "evidence.json").write_text(json.dumps({
+                "schema_version": "1.0",
+                "glossary": [{"source_term": "attention", "preferred_term": "注意力", "type": "concept", "note": ""}],
+            }, ensure_ascii=False), encoding="utf-8")
+            searched = self.run_script("search_chunks.py", root / "chunks.json", "节目如何理解注意力")
+            self.assertEqual(searched["hit_count"], 1)
+            self.assertIn("attention", searched["expanded_query"])
+            self.assertEqual(searched["expansions"][0]["source"], "evidence.glossary")
+
+    def test_search_can_route_translated_claim_to_source_segments(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "chunks.json").write_text(json.dumps({
+                "schema_version": "1.0",
+                "chunks": [{"chunk_id": 0, "segment_ids": [7], "start": "00:00:01", "end": "00:00:05", "text": "Money solves money problems.", "search_text": "money solves money problems"}],
+            }), encoding="utf-8")
+            (root / "evidence.json").write_text(json.dumps({
+                "schema_version": "1.0",
+                "claims": [{"claim": "金钱能解决金钱问题，但不会自动带来幸福。", "evidence": [{"segment_ids": [7]}]}],
+            }, ensure_ascii=False), encoding="utf-8")
+            searched = self.run_script("search_chunks.py", root / "chunks.json", "他认为金钱和幸福是什么关系")
+            self.assertEqual(searched["hit_count"], 1)
+            self.assertGreater(searched["hits"][0]["evidence_boost"], 0)
+            self.assertEqual(searched["evidence_matches"][0]["collection"], "claims")
+            self.assertEqual(len(searched["evidence_matches"]), 1)
+
     def test_ass_ttml_and_json3_are_normalized(self):
         samples = {
             "sample.ass": "[Events]\nDialogue: 0,0:00:01.00,0:00:03.00,Default,Alice,0,0,0,,{\\i1}Hello\\Nworld\n",

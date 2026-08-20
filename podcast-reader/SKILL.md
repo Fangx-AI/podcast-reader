@@ -157,6 +157,7 @@ Read [references/evidence-and-copyright.md](references/evidence-and-copyright.md
 Treat `bundle.json`, `transcript.json`, and `chunks.json` as the episode's persistent memory. For every follow-up:
 
 1. Search the index using the user's wording plus key synonyms/entities.
+   `search_chunks.py` automatically expands bilingual terms from sibling `evidence.json` and can route translated claim/action wording back to source segment IDs. Add your own translation only when the bundle has no matching structured evidence.
 2. Read adjacent chunks when a statement crosses a boundary.
 3. Answer directly, then provide the smallest sufficient timestamp evidence window.
 4. If combining distant passages, cite each and label the connection `my synthesis`.

@@ -194,7 +194,7 @@ python -m unittest discover -s podcast-reader/tests -v
 python -m compileall -q podcast-reader/scripts
 ```
 
-更详细的设计见 [架构说明](docs/architecture.md)，同类项目对照见 [竞品与顶级 Skill 基准](docs/benchmark.md)，验收范围见 [质量与验收](docs/quality-and-acceptance.md)，真实平台结果见 [公开来源冒烟报告](docs/smoke-results.md)，发布级产品结论见 [v1.1 产品审计](docs/product-audit-v1.1.md)。
+更详细的设计见 [架构说明](docs/architecture.md)，同类项目对照见 [竞品与顶级 Skill 基准](docs/benchmark.md)，验收范围见 [质量与验收](docs/quality-and-acceptance.md)，真实平台结果见 [公开来源冒烟报告](docs/smoke-results.md)，当前用户体验证据见 [验收矩阵](docs/ux-acceptance.md)，版本交付见 [v1.4.0 发布说明](docs/release-v1.4.0.md)。
 
 ## 安全与版权
 

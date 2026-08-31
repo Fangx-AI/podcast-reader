@@ -1,6 +1,19 @@
+<div align="center">
+
 # Podcast Reader v2.0.1 项目交付报告
 
+**长内容研究 Skill 的产品、工程与真实前向验证**
+
+[项目首页](README.md) · [文档中心](docs/README.md) · [v2.0.1 Release](https://github.com/Fangx-AI/podcast-reader/releases/tag/v2.0.1)
+
+</div>
+
+---
+
 ## 交付结论
+
+> [!IMPORTANT]
+> **交付状态：可发布、可安装、可恢复、可验证。** 本地 58 / 58 测试通过，Windows / Linux 多版本 CI 通过，确定性发布包、SHA-256 与 SBOM 已生成。
 
 Podcast Reader 已从“能读取播客”升级为可发布的长内容研究 Skill：用户只需提供 Bilibili、YouTube、RSS、节目页、媒体直链或本地文件，当前 Agent 即可完成来源解析、字幕优先获取、零 Key 本地转写、时间戳索引、证据约束分析、持续追问、翻译/说话人回填、可点击阅读器及安全导出。
 

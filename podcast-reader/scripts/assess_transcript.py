@@ -14,6 +14,16 @@ from typing import Any
 from runtime_utils import atomic_write_json
 
 
+def repeated_pattern_span(text: str) -> int:
+    """Return the longest suspicious repeated span, including CJK text without spaces."""
+    collapsed = re.sub(r"\s+", "", text.casefold())
+    longest = max((len(match.group(0)) for match in re.finditer(r"(.)\1{11,}", collapsed)), default=0)
+    for width in range(2, min(13, len(collapsed) // 8 + 1)):
+        pattern = re.compile(rf"(.{{{width}}})\1{{7,}}")
+        longest = max(longest, max((len(match.group(0)) for match in pattern.finditer(collapsed)), default=0))
+    return longest
+
+
 def assess(document: dict[str, Any]) -> dict[str, Any]:
     segments = [item for item in document.get("segments", []) if isinstance(item, dict)]
     errors: list[str] = []
@@ -35,6 +45,16 @@ def assess(document: dict[str, Any]) -> dict[str, Any]:
     suspicious = [text for text in texts if len(text.split()) >= 8 and len(set(text.casefold().split())) <= 2]
     if suspicious:
         warnings.append("possible repeated-token ASR hallucination")
+    pathological = []
+    for index, text in enumerate(texts):
+        repeated_span = repeated_pattern_span(text)
+        if repeated_span >= 32:
+            pathological.append({"segment_id": segments[index].get("segment_id", index + 1), "repeated_span": repeated_span})
+    if pathological:
+        warnings.append(
+            "possible within-segment ASR repetition in segment(s): "
+            + ", ".join(str(item["segment_id"]) for item in pathological[:12])
+        )
     confidence_values = [float(item["confidence"]) for item in segments if isinstance(item.get("confidence"), (int, float))]
     low_confidence = sum(value < 0.5 for value in confidence_values)
     if confidence_values and low_confidence / len(confidence_values) > 0.2:
@@ -58,6 +78,9 @@ def assess(document: dict[str, Any]) -> dict[str, Any]:
             "segments": len(segments), "timed_segments": len(timed), "timed_coverage": round(len(timed) / len(segments), 4),
             "duration_seconds": round(total_seconds, 3), "speech_seconds": round(sum(durations), 3),
             "characters": characters, "words": words, "exact_repetitions": repetitions,
+            "pathological_segments": len(pathological),
+            "pathological_segment_ids": [item["segment_id"] for item in pathological],
+            "max_repeated_span": max((item["repeated_span"] for item in pathological), default=0),
             "confidence_samples": len(confidence_values), "average_confidence": round(sum(confidence_values) / len(confidence_values), 4) if confidence_values else None,
             "low_confidence_segments": low_confidence,
         },

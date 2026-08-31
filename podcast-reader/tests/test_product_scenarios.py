@@ -208,8 +208,14 @@ class ProductScenarioTests(unittest.TestCase):
             Path(args[-1]).write_bytes(b"audio")
             return subprocess.CompletedProcess(args, 0, "", "")
 
+        def fake_download(_url, destination, _referer):
+            destination.write_bytes(b"source audio")
+            return {"size_bytes": 12, "expected_size_bytes": 12}
+
         original_fetch, original_run = ingest_media.fetch_json, ingest_media.run
+        original_download, original_duration = ingest_media.download_public_stream, ingest_media.media_duration
         ingest_media.fetch_json, ingest_media.run = fake_fetch, fake_run
+        ingest_media.download_public_stream, ingest_media.media_duration = fake_download, lambda _path, _cwd: 60.0
         try:
             with tempfile.TemporaryDirectory() as folder:
                 files, warnings = write_bilibili_audio(metadata, Path(folder), metadata["webpage_url"], "mp3", False)
@@ -219,6 +225,7 @@ class ProductScenarioTests(unittest.TestCase):
                 self.assertNotIn("secret", json.dumps(warnings))
         finally:
             ingest_media.fetch_json, ingest_media.run = original_fetch, original_run
+            ingest_media.download_public_stream, ingest_media.media_duration = original_download, original_duration
 
     def test_chunk_transcripts_restore_global_timeline(self):
         with tempfile.TemporaryDirectory() as folder:

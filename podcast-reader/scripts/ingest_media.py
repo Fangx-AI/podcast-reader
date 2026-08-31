@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -266,6 +267,117 @@ def redact_remote_urls(value: str) -> str:
     return re.sub(r"https?://[^\s'\"]+", "[REMOTE_URL_REDACTED]", value)
 
 
+CONTENT_RANGE = re.compile(r"bytes\s+(\d+)-(\d+)/(\d+|\*)", re.I)
+
+
+def download_public_stream(
+    url: str,
+    destination: Path,
+    referer: str,
+    *,
+    chunk_size: int = 8 * 1024 * 1024,
+    max_bytes: int = 2 * 1024 * 1024 * 1024,
+    max_stalls: int = 5,
+) -> dict[str, int | None]:
+    """Download a public CDN object with byte-range resume and size checks."""
+    if chunk_size <= 0 or max_bytes <= 0 or max_stalls < 1:
+        raise ValueError("download bounds must be positive")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    offset = 0
+    expected_size: int | None = None
+    stalls = 0
+    headers = {
+        "Referer": referer,
+        "User-Agent": "Mozilla/5.0 podcast-reader/2.0",
+        "Accept": "*/*",
+    }
+    with destination.open("wb") as stream:
+        while expected_size is None or offset < expected_size:
+            requested_end = offset + chunk_size - 1
+            if expected_size is not None:
+                requested_end = min(requested_end, expected_size - 1)
+            request = urllib.request.Request(url, headers={**headers, "Range": f"bytes={offset}-{requested_end}"})
+            before = offset
+            try:
+                with safe_urlopen(request, timeout=90) as response:
+                    status = int(getattr(response, "status", response.getcode()))
+                    content_range = response.headers.get("Content-Range") or ""
+                    match = CONTENT_RANGE.fullmatch(content_range.strip())
+                    if status == 206:
+                        if not match:
+                            raise RuntimeError("range response omitted a valid Content-Range header")
+                        response_start = int(match.group(1))
+                        if response_start != offset:
+                            raise RuntimeError(f"range response started at {response_start}, expected {offset}")
+                        if match.group(3) != "*":
+                            total = int(match.group(3))
+                            if expected_size is not None and total != expected_size:
+                                raise RuntimeError("remote object size changed during download")
+                            expected_size = total
+                    elif status == 200:
+                        if offset:
+                            raise RuntimeError("server stopped honoring byte-range resume")
+                        length = response.headers.get("Content-Length")
+                        expected_size = int(length) if length and length.isdigit() else None
+                    else:
+                        raise RuntimeError(f"unexpected HTTP status {status}")
+                    if expected_size is not None and expected_size > max_bytes:
+                        raise RuntimeError(f"remote media exceeds {max_bytes} byte safety limit")
+
+                    while True:
+                        payload = response.read(min(1024 * 1024, max_bytes - offset + 1))
+                        if not payload:
+                            break
+                        stream.write(payload)
+                        offset += len(payload)
+                        if offset > max_bytes or (expected_size is not None and offset > expected_size):
+                            raise RuntimeError("remote media exceeded its declared or configured size")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            except Exception:
+                if offset == before:
+                    stalls += 1
+                    if stalls >= max_stalls:
+                        raise
+                else:
+                    stalls = 0
+                continue
+            if offset == before:
+                stalls += 1
+                if stalls >= max_stalls:
+                    raise RuntimeError("remote media download made no progress")
+            else:
+                stalls = 0
+            if expected_size is None:
+                break
+    if expected_size is not None and offset != expected_size:
+        raise RuntimeError(f"remote media is incomplete: {offset}/{expected_size} bytes")
+    return {"size_bytes": offset, "expected_size_bytes": expected_size}
+
+
+def media_duration(path: Path, cwd: Path) -> float:
+    probe = run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(path)],
+        cwd,
+    )
+    if probe.returncode != 0:
+        raise RuntimeError(tail(probe.stderr or probe.stdout) or "ffprobe could not read media duration")
+    try:
+        duration = float(probe.stdout.strip())
+    except ValueError as exc:
+        raise RuntimeError("ffprobe returned an invalid media duration") from exc
+    if duration <= 0:
+        raise RuntimeError("media duration is not positive")
+    return duration
+
+
+def duration_is_complete(actual: float, expected: float | int | None) -> bool:
+    if not isinstance(expected, (int, float)) or expected <= 0:
+        return actual > 0
+    tolerance = max(3.0, float(expected) * 0.005)
+    return abs(actual - float(expected)) <= tolerance
+
+
 def write_bilibili_audio(
     metadata: dict[str, Any],
     output_dir: Path,
@@ -294,10 +406,31 @@ def write_bilibili_audio(
     for ordinal, page in enumerate(pages, start=1):
         page_number = int(page.get("page") or ordinal)
         cid = page.get("cid")
+        expected_duration = page.get("duration")
         target = output_dir / f"bilibili-{video_id}-p{page_number:02d}.{audio_format}"
-        if target.exists() and not force:
-            written.append(str(target.resolve()))
-            continue
+        existing_audio = sorted({
+            path for path in output_dir.glob(f"bilibili-{video_id}-p{page_number:02d}.*")
+            if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
+        })
+        if not force:
+            reused = False
+            for candidate in existing_audio:
+                try:
+                    cached_duration = media_duration(candidate, output_dir)
+                    if duration_is_complete(cached_duration, expected_duration):
+                        written.append(str(candidate.resolve()))
+                        reused = True
+                        break
+                    warnings.append({
+                        "stage": "audio",
+                        "message": f"discarded incomplete cached Bilibili audio for part {page_number}: "
+                        f"{cached_duration:.3f}s acquired vs {float(expected_duration):.3f}s expected",
+                    })
+                except Exception as exc:
+                    warnings.append({"stage": "audio", "message": f"discarded unreadable cached Bilibili audio for part {page_number}: {exc}"})
+                candidate.unlink(missing_ok=True)
+            if reused:
+                continue
         try:
             play = fetch_json(
                 f"https://api.bilibili.com/x/player/playurl?{parameter}&cid={cid}&qn=16&fnval=16&fourk=0",
@@ -319,20 +452,45 @@ def write_bilibili_audio(
             if not media_url:
                 raise ValueError("public play API returned no usable media stream")
 
-            headers = f"Referer: {referer}\r\nUser-Agent: Mozilla/5.0 podcast-reader/2.0\r\n"
-            overwrite = "-y" if force else "-n"
-            conversion = run(
-                [
-                    "ffmpeg", "-hide_banner", "-loglevel", "error", overwrite,
-                    "-headers", headers, "-i", str(media_url), "-vn",
-                    *codec_args[audio_format], str(target),
-                ],
-                output_dir,
-            )
-            if conversion.returncode != 0 or not target.is_file() or target.stat().st_size == 0:
-                target.unlink(missing_ok=True)
-                detail = redact_remote_urls(tail(conversion.stderr or conversion.stdout))
-                raise RuntimeError(detail or "ffmpeg did not produce an audio file")
+            with tempfile.NamedTemporaryFile(prefix=f".{target.stem}.", suffix=".source.m4a", dir=output_dir, delete=False) as handle:
+                source_temporary = Path(handle.name)
+            with tempfile.NamedTemporaryFile(prefix=f".{target.stem}.", suffix=target.suffix, dir=output_dir, delete=False) as handle:
+                converted_temporary = Path(handle.name)
+            try:
+                download_public_stream(str(media_url), source_temporary, referer)
+                source_duration = media_duration(source_temporary, output_dir)
+                if not duration_is_complete(source_duration, expected_duration):
+                    raise RuntimeError(
+                        f"Bilibili source stream is incomplete: {source_duration:.3f}s acquired "
+                        f"vs {float(expected_duration):.3f}s expected"
+                    )
+                if audio_format == "m4a":
+                    os.replace(source_temporary, target)
+                else:
+                    conversion = run(
+                        [
+                            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                            "-i", str(source_temporary), "-vn",
+                            *codec_args[audio_format], str(converted_temporary),
+                        ],
+                        output_dir,
+                    )
+                    if conversion.returncode != 0 or not converted_temporary.is_file() or converted_temporary.stat().st_size == 0:
+                        detail = redact_remote_urls(tail(conversion.stderr or conversion.stdout))
+                        raise RuntimeError(detail or "ffmpeg did not produce an audio file")
+                    converted_duration = media_duration(converted_temporary, output_dir)
+                    if not duration_is_complete(converted_duration, expected_duration):
+                        raise RuntimeError(
+                            f"normalized Bilibili audio is incomplete: {converted_duration:.3f}s acquired "
+                            f"vs {float(expected_duration):.3f}s expected"
+                        )
+                    os.replace(converted_temporary, target)
+                for obsolete in existing_audio:
+                    if obsolete != target:
+                        obsolete.unlink(missing_ok=True)
+            finally:
+                source_temporary.unlink(missing_ok=True)
+                converted_temporary.unlink(missing_ok=True)
             written.append(str(target.resolve()))
         except Exception as exc:
             warnings.append({
@@ -386,7 +544,7 @@ def main() -> int:
     parser.add_argument("--output-dir", default="outputs/podcast-reader/media")
     parser.add_argument("--mode", choices=("auto", "metadata", "subtitles", "audio", "video", "all"), default="auto")
     parser.add_argument("--sub-langs", default="zh-Hans,zh-Hant,zh-CN,zh-TW,zh,en,ja,ko,all,-live_chat")
-    parser.add_argument("--audio-format", choices=("mp3", "m4a", "opus", "wav"), default="mp3")
+    parser.add_argument("--audio-format", choices=("mp3", "m4a", "opus", "wav"), default="m4a")
     parser.add_argument("--max-duration-minutes", type=float, default=480.0, help="Refuse automatic audio extraction beyond this duration; 0 disables")
     parser.add_argument("--force", action="store_true", help="Allow yt-dlp to overwrite existing acquired files")
     parser.add_argument("--cookies-from-browser", help="Explicit authorized yt-dlp browser cookie source; never set automatically")

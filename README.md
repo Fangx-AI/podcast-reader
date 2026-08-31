@@ -1,4 +1,4 @@
-# Podcast Reader v2.0.0
+# Podcast Reader v2.0.1
 
 把一个播客或长视频链接，变成可检索、可追问、可核验、可复用的研究资料包。
 
@@ -209,7 +209,7 @@ python -m unittest discover -s podcast-reader/tests -v
 python -m compileall -q podcast-reader/scripts
 ```
 
-更详细的设计见 [架构说明](docs/architecture.md)，同类项目对照见 [竞品与顶级 Skill 基准](docs/benchmark.md)，验收范围见 [质量与验收](docs/quality-and-acceptance.md)，真实平台结果见 [公开来源冒烟报告](docs/smoke-results.md)，当前用户体验证据见 [验收矩阵](docs/ux-acceptance.md)，版本交付见 [v2.0.0 发布说明](docs/release-v2.0.0.md)。
+更详细的设计见 [架构说明](docs/architecture.md)，同类项目对照见 [竞品与顶级 Skill 基准](docs/benchmark.md)，验收范围见 [质量与验收](docs/quality-and-acceptance.md)，真实平台结果见 [公开来源冒烟报告](docs/smoke-results.md)，当前用户体验证据见 [验收矩阵](docs/ux-acceptance.md)，版本交付见 [v2.0.1 发布说明](docs/release-v2.0.1.md)。
 
 ## 安全与版权
 

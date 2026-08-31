@@ -1,4 +1,4 @@
-# Podcast Reader v2.0.0
+# Podcast Reader v2.0.1
 
 Podcast Reader turns a public podcast or long-video link into a reusable, timestamp-grounded research bundle.
 

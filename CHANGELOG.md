@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 2.0.1 — 2026-08-31
+
+### Fixed
+
+- Download Bilibili public DASH audio in resumable byte ranges and verify the declared byte count instead of accepting an early clean EOF.
+- Validate cached, downloaded, and normalized Bilibili audio against the platform duration; discard incomplete or unreadable cache entries transactionally.
+- Preserve Bilibili M4A audio without a lossy transcode by default, while retaining explicit MP3, Opus, and WAV conversion options.
+- Detect long within-segment ASR repetition in Chinese and other no-whitespace text instead of reporting a false 100-point transcript-quality pass.
+
+### Verified
+
+- Completed a no-cookie, no-cloud-key 5,900-second Bilibili acquisition, local transcription, evidence-grounded analysis, searchable reader, and privacy-safe export.
+- Added regressions for interrupted range downloads, duration completeness, and CJK repetition hallucinations.
+
 ## 2.0.0 — 2026-08-20
 
 ### Reliability and security

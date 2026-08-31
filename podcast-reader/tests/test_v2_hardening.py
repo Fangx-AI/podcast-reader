@@ -16,11 +16,12 @@ FIXTURES = ROOT / "tests" / "fixtures"
 sys.path.insert(0, str(SCRIPTS))
 
 from apply_diarization import apply as apply_diarization
+from assess_transcript import assess
 from build_release import release_files
 from cleanup_bundle import cleanup
 from doctor import inspect
 from evidence_validator import validate_evidence
-from ingest_media import subtitle_download_candidates
+from ingest_media import download_public_stream, duration_is_complete, subtitle_download_candidates
 from install_skill import install, rollback
 from prepare_audio_chunks import split_audio
 from render_reader import timestamp_url
@@ -196,6 +197,71 @@ class V2HardeningTests(unittest.TestCase):
         candidates = subtitle_download_candidates(metadata, "zh-Hans,en,all,-live_chat")
         self.assertEqual(candidates[:2], [("zh-CN", "human"), ("en", "human")])
         self.assertEqual(candidates[2], ("en-orig", "automatic"))
+
+    def test_public_stream_resumes_after_early_eof_and_verifies_size(self):
+        payload = b"abcdefghij"
+        calls = 0
+
+        class FakeResponse:
+            status = 206
+
+            def __init__(self, start, end, body):
+                self.headers = {"Content-Range": f"bytes {start}-{end}/{len(payload)}"}
+                self.body = body
+                self.offset = 0
+
+            def getcode(self):
+                return self.status
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, size=-1):
+                if self.offset >= len(self.body):
+                    return b""
+                end = len(self.body) if size < 0 else min(len(self.body), self.offset + size)
+                result = self.body[self.offset:end]
+                self.offset = end
+                return result
+
+        def fake_open(request, timeout=90):
+            nonlocal calls
+            calls += 1
+            match = __import__("re").match(r"bytes=(\d+)-(\d+)", request.get_header("Range"))
+            start = int(match.group(1))
+            end = min(int(match.group(2)), len(payload) - 1)
+            body = payload[start:end + 1]
+            if calls == 1:
+                body = body[:2]
+            return FakeResponse(start, end, body)
+
+        with tempfile.TemporaryDirectory() as folder, patch("ingest_media.safe_urlopen", side_effect=fake_open):
+            target = Path(folder) / "media.bin"
+            result = download_public_stream("https://example.com/media", target, "https://example.com", chunk_size=4)
+            self.assertEqual(target.read_bytes(), payload)
+            self.assertEqual(result["expected_size_bytes"], len(payload))
+            self.assertGreater(calls, 2)
+
+    def test_duration_completeness_rejects_truncated_bilibili_audio(self):
+        self.assertTrue(duration_is_complete(5899.52, 5900))
+        self.assertFalse(duration_is_complete(1069.952, 5900))
+
+    def test_transcript_quality_flags_cjk_within_segment_repetition(self):
+        document = {
+            "segments": [
+                {"segment_id": 1, "start_seconds": 0, "end_seconds": 5, "text": "这是一段正常的中文访谈内容。", "confidence": 0.9},
+                {"segment_id": 2, "start_seconds": 5, "end_seconds": 10, "text": "嗯 " * 40, "confidence": 0.8},
+                {"segment_id": 3, "start_seconds": 10, "end_seconds": 15, "text": "45,000,000" * 12, "confidence": 0.7},
+            ]
+        }
+        result = assess(document)
+        self.assertEqual(result["status"], "warn")
+        self.assertEqual(result["metrics"]["pathological_segments"], 2)
+        self.assertEqual(result["metrics"]["pathological_segment_ids"], [2, 3])
+        self.assertGreaterEqual(result["metrics"]["max_repeated_span"], 40)
 
     def test_release_invariants_use_single_version_source(self):
         result = release_check()

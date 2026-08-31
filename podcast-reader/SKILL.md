@@ -2,7 +2,7 @@
 name: podcast-reader
 description: Turn a public podcast, interview, lecture, or long-video link into a timestamp-grounded research bundle for analysis, follow-up Q&A, translation, study, comparison, fact-checking, and Markdown/JSON/subtitle/CSV export. Supports Bilibili, YouTube, RSS, podcast pages, direct media, and local media/transcripts without requiring a cloud API key.
 metadata:
-  version: "2.0.0"
+  version: "2.0.1"
   portability: "agent-skills"
   runtime: "Python 3.10+; network for remote links; FFmpeg for media preparation"
 ---

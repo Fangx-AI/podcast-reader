@@ -1,6 +1,6 @@
 ---
 name: podcast-reader
-description: Turn a public podcast, interview, lecture, or long-video link into a timestamp-grounded research bundle for analysis, follow-up Q&A, translation, study, comparison, fact-checking, and Markdown/JSON/subtitle/CSV export. Supports Bilibili, YouTube, RSS, podcast pages, direct media, and local media/transcripts without requiring a cloud API key.
+description: Use when a user wants to quickly understand, search, question, translate, analyze, or export a public podcast, interview, lecture, or long video from Bilibili, YouTube, RSS, a podcast page, direct media, or a local file. Builds reusable timestamp-grounded episode memory without requiring a cloud API key.
 metadata:
   version: "2.0.1"
   portability: "agent-skills"
@@ -9,9 +9,9 @@ metadata:
 
 # Podcast Reader
 
-Build durable evidence from long-form audio and video:
+Help users understand long-form audio and video without making them finish or manually search the whole recording:
 
-`link/file → acquire → transcribe → normalize → index → analyze → ask → export`
+`link/file → understand quickly → ask → find again → verify → export`
 
 Resolve `{skill_dir}` to this skill's directory. Run helpers as `python "{skill_dir}/scripts/<name>.py" ...`; keep generated bundles in the user's active workspace.
 

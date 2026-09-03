@@ -2,9 +2,11 @@
 
 <div align="center">
 
-## 🎧 Turn hours of podcasts and long-form video into searchable, verifiable knowledge
+<img src="podcast-reader/assets/icon-small.svg" width="88" alt="Podcast Reader icon">
 
-One link in. A timestamp-grounded research bundle, follow-up Q&A, and portable exports out.
+## 🎧 Understand long podcasts fast, ask about the content, and find key moments later
+
+**One link is enough.** Get the key ideas when you do not have time to finish, ask a specific question when that is all you need, and return to the exact source moment when a half-remembered point comes back months later.
 
 [![Release](https://img.shields.io/github/v/release/Fangx-AI/podcast-reader?style=flat-square&color=2563eb)](https://github.com/Fangx-AI/podcast-reader/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/Fangx-AI/podcast-reader/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Fangx-AI/podcast-reader/actions/workflows/ci.yml)
@@ -12,56 +14,47 @@ One link in. A timestamp-grounded research bundle, follow-up Q&A, and portable e
 [![License](https://img.shields.io/github/license/Fangx-AI/podcast-reader?style=flat-square)](LICENSE)
 ![API Key](https://img.shields.io/badge/Cloud_API_Key-optional-16a34a?style=flat-square)
 
-[中文](README.md) · [English](README.en.md) · [Latest release](https://github.com/Fangx-AI/podcast-reader/releases/latest) · [Documentation](docs/README.md) · [Issues](https://github.com/Fangx-AI/podcast-reader/issues)
+[Get started](#30-second-setup) · [Example questions](#ask-it-like-this) · [What you get](#what-you-get) · [中文](README.md) · [English](README.en.md) · [Documentation](docs/README.md)
 
 </div>
 
-> [!NOTE]
-> Podcast Reader is not another summarizer. It gives long-form audio and video durable text memory, timestamp evidence, structured claims, and a reusable local research bundle.
+> [!TIP]
+> Most users do not need a cloud transcription API key. Public captions are used when available; otherwise Podcast Reader can use the host Agent's transcription capability or run transcription locally.
 
 ---
 
-## At a glance
+## What it helps you do
 
-| You provide | Podcast Reader handles | You receive |
+| When this happens | Podcast Reader helps by | What you save |
 |---|---|---|
-| Bilibili or YouTube URL | Source resolution, public captions, audio fallback | Searchable timestamped transcript |
-| RSS feed or episode page | Episode selection and transcript discovery | Chapters and timeline |
-| Local media or transcript | Local transcription, normalization, QA | Claims, quotes, and evidence |
-| A natural-language question | Evidence-aware retrieval | An answer linked to source time |
-| An export request | Privacy sanitization and rights-aware filtering | Markdown, JSON, SRT, VTT, CSV, HTML |
+| You find a two- or three-hour episode | Surfaces its topics, chapters, main ideas, and key moments | Hours of listening just to decide whether it is worth your time |
+| You care about one specific question | Searches the whole episode, answers directly, and cites the relevant time | Scrubbing through the player and replaying fragments |
+| You remember an idea but not the episode or minute | Retrieves the passage from a keyword or natural-language description | Re-listening or searching old notes by hand |
+| The episode is in another language | Translates and explains terms while preserving the source timeline | Extra comprehension effort without losing the original context |
+| You want notes or research material | Exports Markdown, subtitles, JSON, CSV, and a reader page | Copying, cleaning, and formatting everything yourself |
 
-### Beyond transcription
+It does not ask you to build a complicated knowledge-management system first. It does something simpler: **turn long, linear media into content you can understand quickly, question naturally, and find again.**
 
-| Capability | Typical transcription tool | Podcast Reader |
-|---|:---:|:---:|
-| Speech to text | ✓ | ✓ |
-| Resumable long-media processing | varies | ✓ |
-| Argument, disagreement, and chapter analysis | — | ✓ |
-| Claims grounded to exact segments | — | ✓ |
-| Process once, ask repeatedly | — | ✓ |
-| Visual evidence from video | — | ✓ |
-| Translation with segment mapping | — | ✓ |
-| Privacy-safe share bundle | — | ✓ |
-| Vendor-neutral core | — | ✓ |
+## Ask it like this
 
-## Verified on real long-form media
+No special command vocabulary or configuration interview is required. Say what you want in ordinary language.
 
-The latest 98-minute Bilibili forward test completed with **no browser cookies and no cloud transcription API key**:
+| Your goal | A prompt you can copy |
+|---|---|
+| Get the gist | `Help me understand this episode in five minutes: <link>` |
+| Decide whether to listen | `What is this episode about, and which three moments are most worth hearing?` |
+| Ask about the content | `How does the guest answer the question about meaning in life? Explain it in context.` |
+| Find a remembered idea | `I remember a point about the individual and cosmic perspectives. Find the passage and timestamp.` |
+| Map disagreements | `Where do the host and guest disagree? Cite every point to the episode.` |
+| Understand another language | `Translate this into Chinese while preserving important English terms and timestamps.` |
+| Save or share notes | `Export a Notion-friendly Markdown report with chapters and source links.` |
+| Research deeply | `Check the major claims and separate episode evidence, your analysis, and external verification.` |
 
-| Complete media | Timestamped segments | Deep chapters | Grounded claims | Automated tests |
-|---:|---:|---:|---:|---:|
-| 5,899.52 seconds | 202 | 9 | 11 | 58 / 58 |
+Once processing is complete, keep asking follow-up questions without sending the link or transcribing the episode again.
 
-The run covered resumable acquisition, four local transcription chunks, deep analysis, a searchable reader, and a privacy-safe archive. Transcript QA detected two CJK within-segment repetition hallucinations and prevented them from being presented as reliable quotes.
+## 30-second setup
 
-See [forward-test results](docs/smoke-results.md) and the [delivery report](PROJECT-REPORT.md).
-
----
-
-## Quick start
-
-### 1. Clone and install
+### 1. Install once
 
 ~~~bash
 git clone https://github.com/Fangx-AI/podcast-reader.git
@@ -75,20 +68,20 @@ To update an existing installation, opt in explicitly. The installer preserves a
 python podcast-reader/scripts/install_skill.py --force --json
 ~~~
 
-You can also download the [latest release](https://github.com/Fangx-AI/podcast-reader/releases/latest) and copy its <code>podcast-reader/</code> folder into a Skills directory discovered by your Agent.
+You can also download the [latest release](https://github.com/Fangx-AI/podcast-reader/releases/latest) and copy its <code>podcast-reader/</code> folder into a Skills directory discovered by your Agent. Use <code>--target</code> for a custom Skills directory.
 
 | Client | Common location |
 |---|---|
 | Codex | <code>~/.codex/skills/podcast-reader/</code> |
 | Agent Skills-compatible clients | <code>.agents/skills/podcast-reader/</code> |
 
-### 2. Ask naturally
+### 2. Send a link
 
 ~~~text
-Use $podcast-reader to deeply analyze this link, ground every major claim to timestamps, and export Markdown: https://...
+Use $podcast-reader to help me understand this episode quickly: https://...
 ~~~
 
-That is enough. Standard mode chooses a sensible workflow without starting with a technical questionnaire.
+That is enough. The skill selects public captions or available audio and answers in your language. Replace “understand quickly” with “analyze deeply,” “answer this question,” or “help me find a remembered point” whenever needed.
 
 ### 3. Optional machine check
 
@@ -98,28 +91,54 @@ python podcast-reader/scripts/doctor.py --json
 
 Doctor is offline and distinguishes installed readiness from bootstrap capability. It reports whether FFmpeg, yt-dlp, local transcription, storage, or output permissions need attention.
 
-> [!TIP]
-> A cloud API key is optional. Public transcripts are preferred. When none exists, Podcast Reader can use the host Agent's native transcription capability or bootstrap an isolated local <code>faster-whisper</code> runtime through <code>uv</code>.
+> [!NOTE]
+> The first local transcription run for an episode without captions may need to download FFmpeg, isolated dependencies, or a speech model. Doctor tells you exactly what the machine is missing and never asks you to paste an API key into chat.
 
-## Example requests
+## Process once, come back anytime
 
-~~~text
-Break down this Bilibili interview and focus on the guest's view of AI agents.
+Podcast Reader keeps a local, timestamped content bundle for each episode. It is not a one-shot summary: skim the episode today, ask follow-up questions tomorrow, and search for a remembered point months later.
 
-Where do the host and guest disagree? Answer only from the episode and cite timestamps.
-
-Translate this into Chinese while preserving important English quotes, terms, and timestamps.
-
-Export a Notion-friendly Markdown report and a CSV claim ledger.
-
-Compare these three episodes: consensus, conflict, assumptions, and unanswered questions.
-
-Extract charts and slides from the video and connect visual evidence to spoken claims.
+~~~mermaid
+flowchart LR
+    A[One link or local file] --> B[Read and organize the episode]
+    B --> C[Understand it quickly]
+    B --> D[Ask a specific question]
+    B --> E[Find an old idea]
+    B --> F[Translate or export]
+    C --> G[Return to source time]
+    D --> G
+    E --> G
 ~~~
 
-Existing bundles are reused. Follow-up questions search <code>chunks.json</code> and <code>evidence.json</code> instead of downloading or transcribing the episode again.
+On later questions, the skill reuses existing artifacts instead of downloading or transcribing the episode again without a reason.
 
-## How it works
+## What you get
+
+| Result | Why it is useful |
+|---|---|
+| **A readable episode overview** | Learn the subject, conclusions, and whether it deserves more of your time |
+| **A timestamped chapter map** | Jump to the part you care about instead of scrubbing blindly |
+| **Persistent episode Q&A** | Keep asking about people, claims, examples, and disagreements |
+| **A searchable transcript reader** | Find a half-remembered line and return to its source moment |
+| **Timestamp-preserving translations** | Understand another language without losing terms or source alignment |
+| **Markdown and structured exports** | Save to Notion or Obsidian, or continue into research and writing |
+
+Answers lead with the conclusion and then cite the smallest useful time range. If the episode does not contain enough evidence, the skill says so instead of inventing a position.
+
+### How it differs from a summary or transcript
+
+| Capability | One-shot summary | Typical transcript | Podcast Reader |
+|---|:---:|:---:|:---:|
+| Understand the whole episode quickly | ✓ | — | ✓ |
+| Read the complete text | — | ✓ | ✓ |
+| Keep asking episode-specific questions | — | — | ✓ |
+| Find old ideas in natural language | — | Manual search | ✓ |
+| Return to source time for verification | Rare | Varies | ✓ |
+| Analyze chapters, arguments, and disagreement | Basic | — | ✓ |
+| Translate while preserving timeline mapping | Rare | Varies | ✓ |
+| Export Markdown, JSON, and subtitles | Rare | Varies | ✓ |
+
+## How it works internally
 
 ~~~mermaid
 flowchart LR
@@ -163,7 +182,7 @@ Every stage leaves recoverable state. A bundle is marked <code>analyzed</code> o
 > [!IMPORTANT]
 > Spotify, paywalled or authenticated content, private feeds, DRM, and regional restrictions are limited to publicly available information. Podcast Reader does not bypass access controls or read browser cookies by default.
 
-## Research bundle
+## Files and data structure
 
 <details open>
 <summary><strong>Core artifacts</strong></summary>
@@ -188,7 +207,14 @@ episode/
 
 </details>
 
-## Reliability by design
+## Why the answers are easier to trust
+
+- **Answers point somewhere:** major conclusions are tied to the smallest useful source-time window.
+- **Quotes are checkable:** short quotations must occur verbatim in the referenced transcript segments.
+- **Different kinds of evidence stay separate:** episode claims, Agent analysis, visual observations, and external verification are labeled distinctly.
+- **Limitations are visible:** incomplete sources, weak transcription, and unanswered questions are reported directly.
+
+The engineering guardrails below protect that experience:
 
 | Failure mode | Guardrail |
 |---|---|
@@ -200,6 +226,18 @@ episode/
 | Export leaks local details | Absolute paths and sensitive query parameters are sanitized |
 | Full transcript is shared accidentally | Share profile excludes it by default |
 | Prompt injection in source media | Pages, captions, transcripts, and frames are untrusted content |
+
+## Verified on real long-form media
+
+The latest 98-minute Bilibili forward test completed with **no browser cookies and no cloud transcription API key**:
+
+| Complete media | Timestamped segments | Deep chapters | Grounded claims | Automated tests |
+|---:|---:|---:|---:|---:|
+| 5,899.52 seconds | 202 | 9 | 11 | 58 / 58 |
+
+The run covered resumable acquisition, four local transcription chunks, deep analysis, a searchable reader, and a privacy-safe archive. Transcript QA detected CJK within-segment repetition hallucinations and prevented them from being presented as reliable quotes.
+
+See [forward-test results](docs/smoke-results.md) and the [delivery report](PROJECT-REPORT.md).
 
 ## Runtime
 
@@ -255,7 +293,7 @@ Source adapters, transcript formats, language fixtures, analysis workflows, and 
 
 <div align="center">
 
-If Podcast Reader helped you truly read a long-form episode, consider giving the project a ⭐
+If Podcast Reader helps you understand an episode faster or recover a moment you thought you had lost, consider giving the project a ⭐
 
 [Download latest](https://github.com/Fangx-AI/podcast-reader/releases/latest) · [Open an issue](https://github.com/Fangx-AI/podcast-reader/issues) · [Back to top](#podcast-reader-v201)
 

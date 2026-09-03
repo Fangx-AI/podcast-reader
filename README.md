@@ -2,9 +2,11 @@
 
 <div align="center">
 
-## 🎧 把数小时播客与长视频，变成可检索、可追问、可核验的长期知识资产
+<img src="podcast-reader/assets/icon-small.svg" width="88" alt="Podcast Reader 图标">
 
-只需一个链接。自动完成来源解析、字幕优先获取、零 Key 本地转写、章节拆解、证据索引、持续问答与多格式导出。
+## 🎧 快速看懂长播客，直接问内容，随时找回关键片段
+
+**给一个链接就行。** 没时间听完，就先看重点；有具体问题，就直接问；以后想起某个观点，还能回到它在原片中出现的时间点。
 
 [![Release](https://img.shields.io/github/v/release/Fangx-AI/podcast-reader?style=flat-square&color=2563eb)](https://github.com/Fangx-AI/podcast-reader/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/Fangx-AI/podcast-reader/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Fangx-AI/podcast-reader/actions/workflows/ci.yml)
@@ -12,60 +14,47 @@
 [![License](https://img.shields.io/github/license/Fangx-AI/podcast-reader?style=flat-square)](LICENSE)
 ![API Key](https://img.shields.io/badge/Cloud_API_Key-optional-16a34a?style=flat-square)
 
-[中文](README.md) · [English](README.en.md) · [最新版本](https://github.com/Fangx-AI/podcast-reader/releases/latest) · [文档中心](docs/README.md) · [问题反馈](https://github.com/Fangx-AI/podcast-reader/issues)
+[开始使用](#30-秒开始) · [可以怎么问](#你可以直接这样问) · [能得到什么](#你会得到什么) · [中文](README.md) · [English](README.en.md) · [文档中心](docs/README.md)
 
 </div>
 
-> [!NOTE]
-> Podcast Reader 不是“再生成一篇摘要”。它为每期节目建立可复用的文本记忆、时间戳证据和结构化研究档案，让你之后可以继续提问、比较、翻译和导出，而不必重复下载或转写。
+> [!TIP]
+> 大多数情况下不需要配置云转写 API Key。公开字幕可直接处理；没有字幕时，可以使用宿主 Agent 的转写能力或在本机转写。
 
 ---
 
-## 一眼看懂
+## 它能帮你做什么
 
-| 你提供 | Podcast Reader 自动完成 | 你最终得到 |
+| 当你遇到这种情况 | Podcast Reader 会怎么帮你 | 你省下什么 |
 |---|---|---|
-| Bilibili / YouTube 链接 | 解析来源、寻找公开字幕、必要时获取音频 | 可搜索的完整转录 |
-| RSS / 播客节目页 | 精确选择节目、发现 transcript 或 enclosure | 章节与时间线 |
-| 本地音视频 / 字幕 | 本地转写、格式标准化、质量评估 | 主张、短引与证据 |
-| 一个自然语言问题 | 检索相关片段、回到原始时间戳 | 有出处的回答 |
-| 导出要求 | 隐私净化、版权友好的内容裁剪 | Markdown / JSON / SRT / VTT / CSV / HTML |
+| 刚发现一期两三个小时的节目 | 先给出主题、章节、核心观点和关键片段 | 不必从头听完，几分钟判断是否值得深入 |
+| 只关心其中一个问题 | 检索整期内容后直接回答，并附对应时间戳 | 不必拖动进度条反复试听 |
+| 记得一个观点，却忘了哪期、哪一分钟 | 按关键词或自然语言找回相关段落 | 不必重听整期或翻遍旧笔记 |
+| 想听外语播客，但理解成本太高 | 翻译、解释术语，并保留原始时间轴 | 更快理解，同时还能核对原文 |
+| 想整理笔记、研究材料或分享内容 | 导出 Markdown、字幕、JSON、CSV 和阅读页面 | 不必手动复制、整理和重新排版 |
 
-### 它和普通转录工具有什么不同？
+它不会要求你先建立一套复杂的知识管理系统。它做的事情很直接：**让原本只能顺序播放的长内容，变得可以快速理解、随时询问和重新找到。**
 
-| 能力 | 普通转录工具 | Podcast Reader |
-|---|:---:|:---:|
-| 获取文字 | ✓ | ✓ |
-| 长内容断点恢复 | 视产品而定 | ✓ |
-| 章节、论证与分歧拆解 | — | ✓ |
-| 主张与原文时间戳绑定 | — | ✓ |
-| 处理一次，持续追问 | — | ✓ |
-| 视频画面证据 | — | ✓ |
-| 多语言翻译且保留 segment 映射 | — | ✓ |
-| 隐私安全分享包 | — | ✓ |
-| 不绑定云厂商 | — | ✓ |
+## 你可以直接这样问
 
-## 已验证的真实效果
+不需要学习命令，也不需要先决定复杂参数。像平时聊天一样说出目的即可。
 
-最新的 98 分钟 Bilibili 前向测试在**无浏览器 Cookie、无云转写 API Key**的环境下完成：
+| 你的目的 | 可以直接复制的说法 |
+|---|---|
+| 快速了解 | `帮我用 5 分钟读懂这期播客：<链接>` |
+| 判断是否值得听 | `这期主要讲什么？最值得听的三个片段在哪里？` |
+| 询问具体内容 | `嘉宾如何回答“人生有没有意义”？请结合上下文说明。` |
+| 找回以前听过的观点 | `我记得他谈过“个人视角和宇宙视角”，帮我找到原话和时间点。` |
+| 梳理分歧 | `主持人和嘉宾在哪些问题上意见不同？每一点附时间戳。` |
+| 听懂外语内容 | `翻译成中文，保留重要英文原句、专有名词和时间戳。` |
+| 做笔记或分享 | `整理成适合 Notion 的 Markdown，保留章节和来源链接。` |
+| 深入研究 | `检查关键主张，区分节目原话、你的分析和外部事实核验。` |
 
-| 完整媒体 | 时间戳片段 | 深度章节 | 证据化主张 | 自动测试 |
-|---:|---:|---:|---:|---:|
-| 5,899.52 秒 | 202 | 9 | 11 | 58 / 58 |
-
-- 完成公开音频获取、4 块可恢复本地转写、分析、阅读器与安全分享包。
-- 自动识别并标记中文 ASR 的段内重复幻觉，没有把异常文本包装成可靠引文。
-- Markdown、结构化证据、bundle 与可点击阅读器均通过严格校验。
-
-查看完整测试记录：[公开来源冒烟报告](docs/smoke-results.md) · [项目交付报告](PROJECT-REPORT.md)
-
----
-
-<a id="quick-start"></a>
+处理完成后，你可以继续追问，不需要重新发送链接或重新转写整期节目。
 
 ## 30 秒开始
 
-### 1. 获取并安装
+### 1. 安装一次
 
 ~~~bash
 git clone https://github.com/Fangx-AI/podcast-reader.git
@@ -79,20 +68,20 @@ python podcast-reader/scripts/install_skill.py --json
 python podcast-reader/scripts/install_skill.py --force --json
 ~~~
 
-也可以从 [最新 Release](https://github.com/Fangx-AI/podcast-reader/releases/latest) 下载 ZIP，把其中的 <code>podcast-reader/</code> 复制到 Agent 能发现的 Skills 目录。
+也可以从 [最新 Release](https://github.com/Fangx-AI/podcast-reader/releases/latest) 下载 ZIP，把其中的 <code>podcast-reader/</code> 复制到 Agent 能发现的 Skills 目录。需要安装到自定义目录时使用 <code>--target</code>。
 
 | 客户端 | 常见目录 |
 |---|---|
 | Codex | <code>~/.codex/skills/podcast-reader/</code> |
 | Agent Skills 兼容客户端 | <code>.agents/skills/podcast-reader/</code> |
 
-### 2. 直接对 Agent 说
+### 2. 发一个链接
 
 ~~~text
-用 $podcast-reader 完整分析这个链接：https://...
+用 $podcast-reader 帮我快速了解这期播客：https://...
 ~~~
 
-这已经足够。默认 <code>standard</code> 模式会自动选择合理流程，不会先让用户填写一长串技术参数。
+这已经足够。Skill 会自动选择公开字幕或可用音频，并使用与你相同的语言回答。你也可以把“快速了解”换成“完整拆解”“回答这个问题”或“帮我找回一个观点”。
 
 ### 3. 可选：检查当前机器
 
@@ -102,28 +91,54 @@ python podcast-reader/scripts/doctor.py --json
 
 Doctor 不访问网络，会明确区分“已经离线就绪”和“首次运行可自动引导”，也会告诉你缺少的是 FFmpeg、yt-dlp、本地转写环境，还是磁盘写入能力。
 
-> [!TIP]
-> 核心流程不要求云 API Key。存在公开字幕时直接处理；没有字幕时，优先使用宿主 Agent 的原生能力，否则可以通过 <code>uv</code> 引导隔离的本地 <code>faster-whisper</code>。
+> [!NOTE]
+> 第一次在没有字幕的节目上启用本地转写时，可能需要下载 FFmpeg、隔离依赖或语音模型。Doctor 会明确告诉你当前机器缺少什么，不会要求你把 API Key 粘贴到聊天里。
 
-## 你可以这样用
+## 一次处理，以后随时回来问
 
-~~~text
-把这期 B 站访谈完整拆解，重点看嘉宾对 AI Agent 的判断。
+Podcast Reader 会为每期节目保留带时间戳的本地内容包。它不是一次性摘要：今天可以先快速了解，明天继续追问，几个月后还能搜索曾经听过的观点。
 
-只根据节目回答：主持人和嘉宾在哪里有分歧？每一点给时间戳。
-
-翻译成中文，保留重要英文原句、专有名词和原始时间戳。
-
-导出一份适合 Notion 的 Markdown，再把所有主张导出为 CSV。
-
-比较这三期播客对“长期记忆”的定义，区分共识、冲突和未回答问题。
-
-抽取视频里的图表和幻灯片，把画面证据与口头论述对应起来。
+~~~mermaid
+flowchart LR
+    A[一个链接或本地文件] --> B[读取并整理整期内容]
+    B --> C[快速了解重点]
+    B --> D[询问具体问题]
+    B --> E[找回旧观点]
+    B --> F[翻译或导出]
+    C --> G[时间戳回到原片]
+    D --> G
+    E --> G
 ~~~
 
-处理过的节目会复用本地 bundle。后续追问检索 <code>chunks.json</code> 和 <code>evidence.json</code>，不会重新下载整期内容。
+再次提问时，Skill 会优先复用已有内容，不会无故重新下载或转写。
 
-## 工作方式
+## 你会得到什么
+
+| 结果 | 对你有什么用 |
+|---|---|
+| **几分钟可读的内容概览** | 快速知道主题、结论和这期是否值得继续听 |
+| **带时间戳的章节地图** | 直接跳到真正关心的部分，不必盲目拖动进度条 |
+| **可以持续追问的节目记忆** | 围绕人物、观点、例子和分歧继续提问 |
+| **可搜索的全文阅读器** | 用关键词找回一句话，并返回对应原片位置 |
+| **多语言版本** | 翻译内容，同时保留原文、术语和时间轴对应关系 |
+| **Markdown 等导出文件** | 保存到 Notion、Obsidian，或继续用于研究与写作 |
+
+回答默认先给结论，再提供足够小的时间范围。节目没有讲过的内容会明确说明，不会为了回答而编造节目观点。
+
+### 它和普通摘要或转录工具有什么不同？
+
+| 能力 | 一次性摘要 | 普通转录工具 | Podcast Reader |
+|---|:---:|:---:|:---:|
+| 快速了解整期内容 | ✓ | — | ✓ |
+| 查看完整文字 | — | ✓ | ✓ |
+| 针对节目持续提问 | — | — | ✓ |
+| 用自然语言找回旧观点 | — | 依赖手动搜索 | ✓ |
+| 回到原片时间点核对 | 少见 | 视产品而定 | ✓ |
+| 章节、论证与分歧拆解 | 简单概括 | — | ✓ |
+| 多语言翻译并保留时间轴 | 少见 | 视产品而定 | ✓ |
+| Markdown / JSON / 字幕等导出 | 少见 | 视产品而定 | ✓ |
+
+## 内部工作方式
 
 ~~~mermaid
 flowchart LR
@@ -167,7 +182,7 @@ flowchart LR
 > [!IMPORTANT]
 > Spotify、付费墙、登录内容、私人 Feed、DRM 和地区限制只处理公开可得信息。项目不会绕过访问控制，也不会默认读取浏览器 Cookie。
 
-## 你会得到什么
+## 文件与数据结构
 
 <details open>
 <summary><strong>核心交付物</strong></summary>
@@ -194,7 +209,14 @@ episode/
 
 分析报告不止包含“摘要 + 金句”，还可以包括章节地图、中心问题、论据与反例、主张账本、说话人分歧、概念解释、行动启示、强弱点评估、未回答问题、外部核验队列和限制说明。
 
-## 可靠性设计
+## 为什么回答更可信
+
+- **回答有出处：** 每个关键结论尽量绑定到最小可用时间范围。
+- **原话可核对：** 短引文必须能在对应转录片段中逐字找到。
+- **事实不混在一起：** 节目原话、Agent 分析、画面观察和外部核验会明确区分。
+- **不知道就说明：** 来源不完整、转写质量不足或节目没有回答时，会直接标注限制。
+
+下面这些工程机制负责守住上述体验：
 
 | 风险 | Podcast Reader 的处理 |
 |---|---|
@@ -206,6 +228,20 @@ episode/
 | 分享泄露本机信息 | 净化绝对路径和敏感 URL 参数 |
 | 版权边界不清 | 分享包默认不携带完整逐字稿 |
 | 平台内容提示注入 | 页面、字幕、转写和画面一律视为不可信内容 |
+
+## 已验证的真实效果
+
+最新的 98 分钟 Bilibili 前向测试在**无浏览器 Cookie、无云转写 API Key**的环境下完成：
+
+| 完整媒体 | 时间戳片段 | 深度章节 | 证据化主张 | 自动测试 |
+|---:|---:|---:|---:|---:|
+| 5,899.52 秒 | 202 | 9 | 11 | 58 / 58 |
+
+- 完成公开音频获取、4 块可恢复本地转写、分析、阅读器与安全分享包。
+- 自动识别并标记中文 ASR 的段内重复幻觉，没有把异常文本包装成可靠引文。
+- Markdown、结构化证据、bundle 与可点击阅读器均通过严格校验。
+
+查看完整测试记录：[公开来源冒烟报告](docs/smoke-results.md) · [项目交付报告](PROJECT-REPORT.md)
 
 ## 高级命令
 
@@ -303,7 +339,7 @@ python podcast-reader/scripts/release_check.py
 
 <div align="center">
 
-如果 Podcast Reader 帮你真正读完了一期长内容，欢迎给项目一个 ⭐
+如果 Podcast Reader 帮你更快听懂一期节目，或找回了那段一直想不起位置的内容，欢迎给项目一个 ⭐
 
 [下载最新版本](https://github.com/Fangx-AI/podcast-reader/releases/latest) · [查看路线与问题](https://github.com/Fangx-AI/podcast-reader/issues) · [回到顶部](#podcast-reader-v201)
 

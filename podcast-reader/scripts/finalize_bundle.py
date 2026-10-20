@@ -77,7 +77,10 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
         not bundle.get("analysis_mode") and isinstance(evidence, dict) and "digest" in evidence
     )
     if summary_mode:
-        digest_result = validate_digest(evidence, transcript, required=True)
+        digest_result = validate_digest(
+            evidence, transcript, required=True,
+            require_questions=bundle.get("question_contract_version") == 1,
+        )
         checks["summary_grounded"] = digest_result["valid"]
         errors.extend(f"summary:{item}" for item in digest_result["errors"])
     else:

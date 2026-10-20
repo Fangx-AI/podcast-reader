@@ -49,8 +49,11 @@
     ],
     "quick_takes": [
       {
-        "question": "从哪开始？",
-        "answer": "先选任务。找一个高频、输入明确、结果能验收的小任务，再决定用什么工具。",
+        "question": "普通人初学 AI，怎样选一个适合开始的小任务？",
+        "why_it_matters": "避免把收藏工具当成学习成果，让第一次尝试有可验收的结果。",
+        "question_origin": "explicit",
+        "answer_status": "answered",
+        "answer": "选高频、输入明确、结果能判断的任务。三项都满足，再做一次小实验，按任务需要选工具。",
         "evidence": [
           {
             "start": "00:00:30",
@@ -63,8 +66,11 @@
         ]
       },
       {
-        "question": "出稿快就算省时？",
-        "answer": "不一定。要比较含核查、修改的总耗时；生成速度只是其中一部分，不能直接当作收益。",
+        "question": "AI 出稿更快，怎样判断整个任务是否真的省时？",
+        "why_it_matters": "核查和修改也花时间，只看生成速度会高估完整流程的收益。",
+        "question_origin": "synthesized",
+        "answer_status": "answered",
+        "answer": "比较包含核查、修改的总耗时。用同一批实际任务做对照，不能把出稿快直接等同于整个任务省时。",
         "evidence": [
           {
             "start": "00:01:30",
@@ -72,12 +78,22 @@
             "segment_ids": [
               4
             ]
+          },
+          {
+            "start": "00:02:30",
+            "end": "00:03:00",
+            "segment_ids": [
+              6
+            ]
           }
         ]
       },
       {
-        "question": "哪些任务先别试？",
-        "answer": "先避开无法复核的任务。自己不能判断对错、材料未获授权、重要决策没人复核时，缺少可靠试错条件。",
+        "question": "哪些任务不适合作为第一次 AI 试验？",
+        "why_it_matters": "试验需要明确的材料使用权限，以及能够判断结果的复核人。",
+        "question_origin": "explicit",
+        "answer_status": "answered",
+        "answer": "自己不能判断对错的任务不适合首次练习。未经授权的客户材料不能随便上传；重要决策要先确定谁来复核。",
         "evidence": [
           {
             "start": "00:03:00",
@@ -89,14 +105,41 @@
         ]
       },
       {
-        "question": "何时值得自动化？",
-        "answer": "流程跑稳定之后。先识别常见错误和人工接管位置，再自动化，否则错误也会一起被放大。",
+        "question": "手动配合 AI 的流程满足什么条件，才值得自动化？",
+        "why_it_matters": "自动化会同时放大效率和错误，不能只关注它省去多少人工操作。",
+        "question_origin": "explicit",
+        "answer_status": "answered",
+        "answer": "先把手动加 AI 的流程跑稳定，知道常见错误和人工接管位置，再考虑自动化。",
         "evidence": [
           {
             "start": "00:03:30",
             "end": "00:04:00",
             "segment_ids": [
               8
+            ]
+          }
+        ]
+      },
+      {
+        "question": "一个 AI 流程要验证多少次，才能认定稳定？",
+        "why_it_matters": "前面把流程稳定作为自动化的条件，因此怎样判断稳定会影响是否继续扩大使用。",
+        "question_origin": "explicit",
+        "answer_status": "partial",
+        "answer": "节目明确没有统一次数。周也认为任务差异和错误代价太大，需要结合具体场景继续验证。",
+        "gap": "还缺具体场景的验证次数和稳定判定方法，不能据此确认某个流程已经稳定。",
+        "evidence": [
+          {
+            "start": "00:03:30",
+            "end": "00:04:00",
+            "segment_ids": [
+              8
+            ]
+          },
+          {
+            "start": "00:05:00",
+            "end": "00:05:30",
+            "segment_ids": [
+              11
             ]
           }
         ]
@@ -162,9 +205,7 @@
         ]
       }
     ],
-    "open_questions": [
-      "跑多少次才算稳定？对话未给出统一门槛，要结合任务差异和错误代价继续验证。"
-    ]
+    "core_question": "普通人怎样判断 AI 真正帮上了工作，而不是只学会了一个工具？"
   },
   "chapters": [
     {

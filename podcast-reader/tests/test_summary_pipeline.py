@@ -43,6 +43,8 @@ class SummaryPipelineTests(unittest.TestCase):
             self.assertEqual(handoff["mode"], "summary")
             self.assertEqual(handoff["required_outputs"], {"evidence": "evidence.json"})
             self.assertIn("whole_episode", handoff["summary_contract"])
+            self.assertEqual(handoff["summary_contract"]["question_contract_version"], 1)
+            self.assertIn("core_question", handoff["summary_contract"]["required_digest_fields"])
             self.assertFalse((episode / "summary.md").exists())
             result = finalize(episode)
             self.assertTrue(result["valid"], result)
@@ -50,7 +52,8 @@ class SummaryPipelineTests(unittest.TestCase):
             summary = (episode / "summary.md").read_text(encoding="utf-8")
             self.assertIn("关键问题", summary)
             self.assertIn("高价值信息", summary)
-            self.assertIn("仍未解决", summary)
+            self.assertIn("本期核心问题", summary)
+            self.assertIn("部分回答", summary)
             self.assertNotIn("主张账本", summary)
             self.assertEqual(summary, (episode / "analysis.md").read_text(encoding="utf-8"))
             self.assertTrue((episode / "reader.html").is_file())
@@ -101,6 +104,21 @@ class SummaryPipelineTests(unittest.TestCase):
             self.assertFalse((episode / "reader.html").exists())
             state = json.loads((episode / "bundle.json").read_text(encoding="utf-8"))
             self.assertEqual(state["status"], "ready_for_analysis")
+
+    def test_new_summary_task_cannot_skip_question_contract(self):
+        with tempfile.TemporaryDirectory() as folder:
+            episode = self.prepare(Path(folder))
+            evidence = json.loads((episode / "evidence.json").read_text(encoding="utf-8"))
+            evidence["digest"].pop("core_question", None)
+            for item in evidence["digest"]["quick_takes"]:
+                for field in ("why_it_matters", "question_origin", "answer_status", "gap"):
+                    item.pop(field, None)
+            (episode / "evidence.json").write_text(json.dumps(evidence, ensure_ascii=False), encoding="utf-8")
+            result = finalize(episode)
+            self.assertFalse(result["valid"], result)
+            self.assertTrue(any("core_question" in message for message in result["errors"]))
+            self.assertFalse((episode / "reader.html").exists())
+            self.assertFalse((episode / "summary.md").exists())
 
     def test_reader_failure_does_not_mark_bundle_complete(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -154,9 +172,15 @@ class SummaryPipelineTests(unittest.TestCase):
             evidence["summary"] = "先选能检查结果的任务。"
             evidence["digest"] = {
                 "headline": "先选能检查结果的任务",
+                "core_question": "第一次用 AI，该选什么任务？",
                 "takeaway": "先选任务，再选工具。",
                 "evidence": [{"segment_ids": [1]}],
-                "quick_takes": [{"question": "先选什么？", "answer": "先选能检查结果的任务。", "evidence": [{"segment_ids": [1]}]}],
+                "quick_takes": [{
+                    "question": "第一次用 AI，该选什么任务？",
+                    "why_it_matters": "结果能否检查决定任务是否适合作为起点。",
+                    "question_origin": "synthesized", "answer_status": "answered",
+                    "answer": "先选能检查结果的任务。", "evidence": [{"segment_ids": [1]}],
+                }],
                 "insights": [{"title": "验收先行", "summary": "结果必须能检查。", "evidence": [{"segment_ids": [1]}]}],
             }
             evidence["chapters"] = []

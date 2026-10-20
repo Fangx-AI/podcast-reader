@@ -106,7 +106,10 @@ def validate(episode_dir: Path) -> dict:
             checks["evidence_grounded"] = evidence_result["valid"]
             errors.extend(f"evidence: {item}" for item in evidence_result["errors"])
             if summary_mode:
-                digest_result = validate_digest(evidence, transcript, required=True)
+                digest_result = validate_digest(
+                    evidence, transcript, required=True,
+                    require_questions=bundle.get("question_contract_version") == 1,
+                )
                 checks["summary_grounded"] = digest_result["valid"]
                 errors.extend(f"summary: {item}" for item in digest_result["errors"])
                 if evidence_result["valid"] and digest_result["valid"]:

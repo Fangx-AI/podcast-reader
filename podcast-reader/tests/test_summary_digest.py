@@ -42,7 +42,7 @@ class SummaryDigestTests(unittest.TestCase):
         self.assertTrue(result["valid"], result)
         self.assertEqual(result["metrics"]["cited_segments"], 1)
         markdown = render_markdown(self.evidence, {}, self.transcript)
-        for value in ("# 先小步验证", "## 一句话总结", "## 关键问题 · 直接看答案", "## 高价值信息", "## 说明与限制", "[00:00:00–00:00:10]"):
+        for value in ("# 先小步验证", "## 一句话总结", "## 关键问题 · 逐题解读", "## 高价值信息", "## 说明与限制", "[00:00:00–00:00:10]"):
             self.assertIn(value, markdown)
         self.assertNotIn("## 回听章节", markdown)
         self.assertNotIn("## 可以怎么做", markdown)
@@ -214,7 +214,7 @@ class SummaryDigestTests(unittest.TestCase):
         document["digest"]["open_questions"] = ["What remains uncertain?"]
         markdown = render_markdown(document, {"output_language": "en"}, transcript)
         for expected in ("Source:", "Listen to the episode", "## One-sentence takeaway",
-                         "## Key questions · Direct answers", "## High-value insights",
+                         "## Key questions · Answers and gaps", "## High-value insights",
                          "## Participants", "Text segment #1", " · Method",
                          "## Open questions", "## Notes and limitations"):
             self.assertIn(expected, markdown)
@@ -233,6 +233,130 @@ class SummaryDigestTests(unittest.TestCase):
                     self.assertNotIn("private", markdown)
                     self.assertNotIn("podcasts", markdown)
                     self.assertNotIn(source, markdown)
+
+    def question_first_document(self, status="answered"):
+        document = copy.deepcopy(self.evidence)
+        document["digest"]["core_question"] = "怎样用小实验决定是否继续投入？"
+        question = document["digest"]["quick_takes"][0]
+        question.update({
+            "why_it_matters": "起点决定了实验结果能否支持下一步决策。",
+            "question_origin": "synthesized",
+            "answer_status": status,
+        })
+        if status in {"partial", "unanswered"}:
+            question["gap"] = "节目没有给出继续投入的统一门槛。"
+        return document
+
+    def test_question_first_contract_and_markdown_reading_order(self):
+        document = self.question_first_document("partial")
+        result = validate_digest(document, self.transcript, required=True)
+        self.assertTrue(result["valid"], result)
+        markdown = render_markdown(document, {}, self.transcript)
+        sections = ["# 先小步验证", "## 本期核心问题", "## 本期问题清单", "## 一句话总结", "## 关键问题 · 逐题解读", "## 高价值信息"]
+        positions = [markdown.index(section) for section in sections]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("1. 如何开始？ — 节目回答状态：部分回答", markdown)
+        self.assertIn("**为什么重要：**", markdown)
+        self.assertIn("**节目回答（部分回答）：**", markdown)
+        self.assertIn("**仍缺什么：**", markdown)
+        self.assertIn("问题来源：根据节目讨论归纳", markdown)
+        self.assertIn("原文出处：[00:00:00–00:00:10]", markdown)
+
+    def test_legacy_questions_do_not_receive_invented_core_question_or_status(self):
+        self.assertTrue(validate_digest(self.evidence, self.transcript)["valid"])
+        markdown = render_markdown(self.evidence, {}, self.transcript)
+        self.assertIn("## 本期问题清单", markdown)
+        self.assertIn("1. 如何开始？", markdown)
+        for absent in ("## 本期核心问题", "节目回答状态", "已回答", "为什么重要", "问题来源："):
+            self.assertNotIn(absent, markdown)
+        self.assertLess(markdown.index("## 本期问题清单"), markdown.index("## 一句话总结"))
+
+    def test_core_question_and_new_fields_are_typed_bounded_and_required(self):
+        for invalid in (None, "", " ", [], "问" * 161):
+            document = self.question_first_document()
+            document["digest"]["core_question"] = invalid
+            self.assertFalse(validate_digest(document, self.transcript)["valid"])
+        for field in ("why_it_matters", "question_origin", "answer_status"):
+            document = self.question_first_document()
+            document["digest"]["quick_takes"][0].pop(field)
+            self.assertFalse(validate_digest(document, self.transcript)["valid"], field)
+        for field, invalid in (
+            ("why_it_matters", ""), ("why_it_matters", "字" * 301),
+            ("why_it_matters", []), ("question_origin", "inferred"),
+            ("question_origin", None), ("question_origin", []),
+            ("answer_status", "verified"), ("answer_status", None),
+            ("answer_status", []), ("gap", 123),
+        ):
+            document = self.question_first_document()
+            document["digest"]["quick_takes"][0][field] = invalid
+            self.assertFalse(validate_digest(document, self.transcript)["valid"], (field, invalid))
+
+    def test_answer_status_and_gap_are_consistent_even_without_core_question(self):
+        for status in ("partial", "unanswered"):
+            for legacy in (False, True):
+                document = self.question_first_document(status)
+                if legacy:
+                    document["digest"].pop("core_question")
+                self.assertTrue(validate_digest(document, self.transcript)["valid"])
+                for invalid in (None, "", " ", [], "字" * 301):
+                    candidate = copy.deepcopy(document)
+                    candidate["digest"]["quick_takes"][0]["gap"] = invalid
+                    self.assertFalse(validate_digest(candidate, self.transcript)["valid"])
+                document["digest"]["quick_takes"][0].pop("gap")
+                self.assertFalse(validate_digest(document, self.transcript)["valid"])
+        for gap in (None, "", " "):
+            document = self.question_first_document("answered")
+            document["digest"]["quick_takes"][0]["gap"] = gap
+            self.assertTrue(validate_digest(document, self.transcript)["valid"])
+        document["digest"]["quick_takes"][0]["gap"] = "Still missing evidence."
+        self.assertFalse(validate_digest(document, self.transcript)["valid"])
+
+    def test_duplicate_questions_ignore_only_case_whitespace_and_punctuation(self):
+        for first, second in (("如何开始？", " 如 何 开 始! "), ("What matters?", "WHAT   MATTERS!"), ("怎么选——任务？", "怎么选任务")):
+            document = copy.deepcopy(self.evidence)
+            question = document["digest"]["quick_takes"][0]
+            question["question"] = first
+            duplicate = copy.deepcopy(question)
+            duplicate["question"] = second
+            document["digest"]["quick_takes"].append(duplicate)
+            result = validate_digest(document, self.transcript)
+            self.assertFalse(result["valid"])
+            self.assertTrue(any("duplicates quick_takes" in error for error in result["errors"]))
+        document["digest"]["quick_takes"][0]["question"] = "何时开始"
+        document["digest"]["quick_takes"][1]["question"] = "什么时候开始"
+        self.assertTrue(validate_digest(document, self.transcript)["valid"])
+
+    def test_question_first_english_and_new_text_fields_are_safely_rendered(self):
+        document = self.question_first_document("unanswered")
+        attack = '<script>alert(1)</script> [link](javascript:alert(1))'
+        document["digest"]["core_question"] = attack
+        question = document["digest"]["quick_takes"][0]
+        question["why_it_matters"] = attack
+        question["gap"] = attack
+        markdown = render_markdown(document, {"output_language": "en"}, self.transcript)
+        for value in ("## The episode's core question", "## Questions in this episode",
+                      "Episode answer status: Unanswered", "**Why it matters:**",
+                      "**Episode answer (Unanswered):**", "**What remains missing:**",
+                      "Question origin: Synthesized from the episode's discussion", "Source evidence:"):
+            self.assertIn(value, markdown)
+        self.assertNotIn("<script>", markdown)
+        self.assertNotIn("[link](javascript:", markdown)
+        self.assertNotIn("节目回答状态", markdown)
+        self.assertLess(markdown.index("## Questions in this episode"), markdown.index("## One-sentence takeaway"))
+
+    def test_core_question_cannot_bypass_source_reference_checks(self):
+        document = self.question_first_document()
+        document["digest"]["evidence"] = [{"segment_ids": [999]}]
+        self.assertFalse(validate_digest(document, self.transcript)["valid"])
+
+    def test_new_handoff_can_require_question_contract_without_breaking_legacy(self):
+        self.assertTrue(validate_digest(self.evidence, self.transcript)["valid"])
+        result = validate_digest(self.evidence, self.transcript, require_questions=True)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("digest.core_question" in error for error in result["errors"]))
+        self.assertTrue(any("why_it_matters" in error for error in result["errors"]))
+        self.assertFalse(validate_digest({}, self.transcript, require_questions=True)["valid"])
+        self.assertTrue(validate_digest(self.question_first_document(), self.transcript, require_questions=True)["valid"])
 
 
 if __name__ == "__main__":

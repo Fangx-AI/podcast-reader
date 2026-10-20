@@ -24,11 +24,14 @@ class PageStructure(HTMLParser):
         self.ids = []
         self.markdown = []
         self.in_markdown = False
+        self.question_statuses = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         if attrs.get("id"):
             self.ids.append(attrs["id"])
+        if "question-status" in attrs.get("class", "").split():
+            self.question_statuses.append(attrs.get("data-answer-status"))
         if tag == "pre" and attrs.get("id") == "summary-markdown":
             self.in_markdown = True
         if tag == "details":
@@ -256,6 +259,73 @@ class SummaryReaderTests(unittest.TestCase):
                 _, page, parsed = self.build(Path(folder), {"summary": "旧版摘要"}, extra={"status": "ready_for_analysis"}, finalized=finalized)
             self.assertEqual("copy-summary" in parsed.ids, finalized is True)
             self.assertEqual("这份摘要尚未完成校验" in page, finalized is not True)
+
+    def question_evidence(self):
+        reference = [{"segment_ids": [1]}]
+        return {"digest": {
+            "headline": "AI 工作流的收益与边界",
+            "core_question": "怎样判断 AI 工作流已经稳定？",
+            "takeaway": "节目建议先验收，但没有统一验证次数。",
+            "evidence": reference,
+            "quick_takes": [{
+                "question": "AI 流程要验证多少次，才能认定稳定？",
+                "why_it_matters": "这决定是否适合开始自动化。",
+                "question_origin": "explicit",
+                "answer_status": "partial",
+                "answer": "节目没有给出统一次数。",
+                "gap": "仍缺少可操作的稳定判据。",
+                "evidence": reference,
+            }],
+            "insights": [{
+                "title": "先确认结果能复核", "summary": "评估贴近实际任务。",
+                "evidence": reference,
+            }],
+        }}
+
+    def test_questions_precede_takeaway_and_link_to_complete_answer_cards(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, page, parsed = self.build(Path(folder), self.question_evidence())
+        self.assertIn("<h1>怎样判断 AI 工作流已经稳定？</h1>", page)
+        self.assertLess(page.index('id="question-index"'), page.index('class="takeaway"'))
+        self.assertIn("#question-1", parsed.hrefs)
+        self.assertIn("question-1", parsed.ids)
+        self.assertIn("这决定是否适合开始自动化。", page)
+        self.assertIn("仍缺少可操作的稳定判据。", page)
+        self.assertTrue(parsed.question_statuses)
+        self.assertEqual(set(parsed.question_statuses), {"partial"})
+        self.assertEqual(len(parsed.ids), len(set(parsed.ids)))
+
+    def test_question_details_survive_share_and_canonical_copy_payload(self):
+        evidence = self.question_evidence()
+        with tempfile.TemporaryDirectory() as folder:
+            _, page, parsed = self.build(Path(folder), evidence, include_transcript=False)
+        for field in ("question", "why_it_matters", "answer", "gap"):
+            self.assertIn(evidence["digest"]["quick_takes"][0][field], page)
+            self.assertIn(evidence["digest"]["quick_takes"][0][field], "".join(parsed.markdown))
+        self.assertNotIn("可靠评估让产品真正可用。", "".join(parsed.markdown))
+        self.assertIn("#question-1", parsed.hrefs)
+        self.assertNotIn("#segment-1", parsed.hrefs)
+
+    def test_old_questions_do_not_gain_fabricated_answer_status(self):
+        evidence = {"digest": {"quick_takes": [{
+            "question": "如何选择 AI 的评估任务？", "answer": "参考实际工作。",
+            "evidence": [{"segment_ids": [1]}],
+        }]}}
+        with tempfile.TemporaryDirectory() as folder:
+            _, _, parsed = self.build(Path(folder), evidence)
+        self.assertEqual(parsed.question_statuses, [])
+
+    def test_new_question_fields_remain_literal_text(self):
+        evidence = self.question_evidence()
+        attack = '</h1><script>alert("unsafe")</script>'
+        evidence["digest"]["core_question"] = attack
+        for key in ("why_it_matters", "gap"):
+            evidence["digest"]["quick_takes"][0][key] = attack
+        with tempfile.TemporaryDirectory() as folder:
+            _, page, parsed = self.build(Path(folder), evidence)
+        self.assertNotIn(attack, page)
+        self.assertIn("&lt;/h1&gt;", page)
+        self.assertEqual(parsed.scripts, 1)
 
     def test_timestamp_urls_are_supported_and_strictly_validated(self):
         self.assertIn("t=90s", timestamp_url("https://www.youtube.com/watch?v=x&t=12&start=4", 90))

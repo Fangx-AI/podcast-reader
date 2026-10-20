@@ -129,6 +129,11 @@ LABELS = {
         "reading_basis": "按摘要正文约 400 中文字或 200 英文词／分钟估算，不含逐字稿。",
         "pending_title": "总结尚未生成", "stale": "这份摘要尚未完成校验，内容可能仍在更新。",
         "reference": "依据",
+        "core_question": "本期核心问题", "question_index": "本期关键问题",
+        "question_index_hint": "选择一个问题，往下看", "question_details": "逐题看：回答与未解之处",
+        "why_it_matters": "为什么值得问", "episode_answer": "节目回答", "gap": "仍缺什么",
+        "answered": "节目有回答", "partial": "部分回答", "unanswered": "未解答",
+        "explicit": "节目中提出", "synthesized": "由内容提炼",
     },
     "en": {
         "language": "en", "brand": "PODCAST, CONDENSED", "takeaway": "The takeaway",
@@ -159,6 +164,11 @@ LABELS = {
         "reading_basis": "Estimated at 400 Chinese characters or 200 English words per minute; transcript excluded.",
         "pending_title": "Summary not yet generated", "stale": "This summary has not finished validation and may still be updated.",
         "reference": "Source",
+        "core_question": "The episode's central question", "question_index": "Key questions",
+        "question_index_hint": "Choose a question to explore", "question_details": "The answers — and what is still missing",
+        "why_it_matters": "Why ask this", "episode_answer": "The episode's answer", "gap": "What is still missing",
+        "answered": "Answered in the episode", "partial": "Partially answered", "unanswered": "Unanswered",
+        "explicit": "Raised in the episode", "synthesized": "Drawn from the discussion",
     },
 }
 
@@ -176,8 +186,15 @@ def markdown_summary(evidence: dict[str, Any], bundle: dict[str, Any], transcrip
     digest = evidence.get("digest") if isinstance(evidence.get("digest"), dict) else {}
     lines = [f"# {literal(title)}", "", f"## {labels['takeaway']}", "", literal(takeaway), ""]
     for item in records(digest.get("quick_takes")):
-        if item.get("question") and item.get("answer"):
-            lines.extend([f"### {literal(item['question'])}", "", literal(item["answer"]), ""])
+        if item.get("question"):
+            lines.extend([f"### {literal(item['question'])}", ""])
+            for field in ("answer_status", "question_origin"):
+                value = item.get(field)
+                if isinstance(value, str) and value in {"answered", "partial", "unanswered", "explicit", "synthesized"}:
+                    lines.extend([labels[value], ""])
+            for field, label in (("why_it_matters", "why_it_matters"), ("answer", "episode_answer"), ("gap", "gap")):
+                if item.get(field):
+                    lines.extend([f"**{labels[label]}**", "", literal(item[field]), ""])
     insights = records(digest.get("insights")) or [
         {"title": item.get("claim"), "summary": item.get("speaker")}
         for item in records(evidence.get("claims")) if item.get("claim")
@@ -228,7 +245,9 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
     digest = evidence.get("digest") if isinstance(evidence.get("digest"), dict) else {}
     source_url = next((url for value in (episode.get("source_url"), bundle.get("source_input"), resolution.get("webpage_url"), resolution.get("url")) if (url := safe_source_url(value))), None)
     original_title = str(episode.get("title") or resolution.get("title") or episode_dir.name)
-    title = str(digest.get("headline") or original_title)
+    core_question = digest.get("core_question")
+    core_question = core_question.strip() if isinstance(core_question, str) else ""
+    title = str(core_question or digest.get("headline") or original_title)
     takeaway = str(digest.get("takeaway") or evidence.get("summary") or labels["pending"])
     segments = records(transcript.get("segments"))
     segment_map = {str(item.get("segment_id", index)): item for index, item in enumerate(segments, 1)}
@@ -304,10 +323,24 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
         labels["participants"] = "本期人物"
 
     quick_rows = []
+    question_links = []
     for item in records(digest.get("quick_takes")):
-        if not item.get("question") or not item.get("answer"):
+        if not item.get("question"):
             continue
-        quick_rows.append(f'<article class="card quick-card"><h3 class="question">{esc(item["question"])}</h3><p class="answer">{esc(item["answer"])}</p>{references(item.get("evidence"), mark_missing=True)}</article>')
+        number = len(quick_rows) + 1
+        answer_status, question_origin = item.get("answer_status"), item.get("question_origin")
+        status_html = f'<span class="question-status" data-answer-status="{answer_status}">{esc(labels[answer_status])}</span>' if isinstance(answer_status, str) and answer_status in {"answered", "partial", "unanswered"} else ""
+        origin_html = f'<span class="question-origin" data-question-origin="{question_origin}">{esc(labels[question_origin])}</span>' if isinstance(question_origin, str) and question_origin in {"explicit", "synthesized"} else ""
+        question_meta = f'<div class="question-meta">{status_html}{origin_html}</div>' if status_html or origin_html else ""
+        why_html = f'<p class="question-why"><span class="field-label">{esc(labels["why_it_matters"])}</span>{esc(item["why_it_matters"])}</p>' if item.get("why_it_matters") else ""
+        answer_html = f'<div class="question-answer"><span class="field-label">{esc(labels["episode_answer"])}</span><p class="answer">{esc(item["answer"])}</p></div>' if item.get("answer") else ""
+        gap_html = f'<div class="question-gap"><span class="field-label">{esc(labels["gap"])}</span><p>{esc(item["gap"])}</p></div>' if item.get("gap") else ""
+        quick_rows.append(f'<article id="question-{number}" class="card quick-card" tabindex="-1" aria-labelledby="question-{number}-title"><h3 id="question-{number}-title" class="question"><span class="question-number">{number:02d}</span>{esc(item["question"])}</h3>{question_meta}{why_html}{answer_html}{gap_html}{references(item.get("evidence"), mark_missing=True)}</article>')
+        unresolved = f'<span class="index-answer-status" data-answer-status="{answer_status}">{esc(labels[answer_status])}</span>' if isinstance(answer_status, str) and answer_status in {"partial", "unanswered"} else ""
+        question_links.append(f'<li><a class="question-jump" href="#question-{number}"><span class="question-index-number" aria-hidden="true">{number:02d}</span><span class="question-index-text">{esc(item["question"])}{unresolved}</span><span class="question-index-arrow" aria-hidden="true">↘</span></a></li>')
+    question_index = f'<nav id="question-index" class="question-index" aria-labelledby="question-index-title"><div class="question-index-heading"><h2 id="question-index-title">{esc(labels["question_index"])}</h2><span>{esc(labels["question_index_hint"])}</span></div><ol>{"".join(question_links)}</ol></nav>' if question_links else ""
+    if question_links:
+        labels["quick"] = labels["question_details"]
 
     insights = records(digest.get("insights"))
     if not insights:
@@ -389,7 +422,7 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
     return_control = f'<div class="source-return"><a class="return-summary" href="#summary">← {esc(labels["return"])}</a></div>' if transcript_rows else ""
     details = f'<details class="source-details" id="source-details"><summary>{esc(details_label)}</summary><div class="source-content">{return_control}{chapter_content}{transcript_content}{return_control}</div></details>' if chapter_content or transcript_content else ""
     summary_content = "".join((
-        section("quick", f'<div class="grid">{"".join(quick_rows)}</div>', count=len(quick_rows)) if quick_rows else "",
+        section("quick", f'<div class="question-cards">{"".join(quick_rows)}</div>', count=len(quick_rows)) if quick_rows else "",
         section("insights", "".join(insight_rows), count=len(insight_rows)),
         section("quotes", "".join(quote_rows)), section("actions", "".join(action_rows)), open_questions,
         section("participants", f'<div class="grid">{"".join(participants)}</div>') if participants else "", limitations,
@@ -433,8 +466,8 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
 <link rel="icon" href="data:,">
 <meta name="description" content="{esc(takeaway)}"><title>{esc(title)} · Podcast Reader</title><style>{STYLE}</style></head>
 <body id="top"><a class="skip" href="#summary">{esc(labels["skip"])}</a><div class="page">
-<header class="hero"><div class="eyebrow">{esc(labels["brand"])}</div><h1>{esc(title)}</h1>{subtitle}<div class="metadata">{"".join(metadata)}</div>
-{takeaway_html}{reading_stats}{toolbar}{feedback}{fallback}</header>{nav}
+<header class="hero{" question-led" if question_links else ""}"><div class="eyebrow">{esc(labels["core_question"] if core_question else labels["brand"])}</div><h1>{esc(title)}</h1>{subtitle}<div class="metadata">{"".join(metadata)}</div>
+{question_index}{takeaway_html}{reading_stats}{toolbar}{feedback}{fallback}</header>{nav}
 <main id="summary" tabindex="-1">{summary_content}{details}</main>
 <footer><span>{esc(labels["footer"])}</span><a href="#top">{esc(labels["top"])} ↑</a></footer></div>{payload}{script_tag}</body></html>"""
     output = output.expanduser().resolve()

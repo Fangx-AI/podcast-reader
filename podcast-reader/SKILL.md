@@ -1,6 +1,6 @@
 ---
 name: podcast-reader
-description: Turn an accessible podcast, interview, or long audio/video into a concise 3–5 minute summary. Identify the key questions, direct answers, and high-value insights, grounded in the full episode. Accepts public links, RSS, episode pages, media, captions, or local transcripts; delivers summary.md and a card-style reader.html without requiring a cloud API key.
+description: Turn an accessible podcast, interview, or long audio/video into a concise summary organized around its important questions. Read the full episode, identify and rank explicit or synthesized questions, explain why each matters, and distinguish answered, partial, and unanswered questions before adding useful insights. Delivers summary.md and reader.html from public links or local sources without requiring a cloud API key.
 metadata:
   version: "2.0.1"
   portability: "agent-skills"
@@ -9,9 +9,9 @@ metadata:
 
 # Podcast Reader
 
-One goal: **turn a podcast into a concise summary that identifies its key questions and most valuable information.**
+One goal: **help the reader see which important questions a podcast raises, why they matter, and how far the episode answers them.**
 
-`link/file → obtain content → review the full episode → select what matters → validate evidence → summary + reading page`
+`link/file → read the full episode → core question → candidate questions → rank and merge → verify answer coverage → evidence-backed summary`
 
 Resolve `{skill_dir}` to this skill's directory. Run helpers as `python "{skill_dir}/scripts/<name>.py" ...`; keep generated bundles in the user's active workspace.
 
@@ -19,7 +19,7 @@ Resolve `{skill_dir}` to this skill's directory. Run helpers as `python "{skill_
 
 - A link alone is enough. Default to `summary`, use the user's language, and aim for a 3–5 minute read. Do not ask the user to choose an analysis mode.
 - For a substantial episode, target roughly 900–1,600 Chinese characters or 500–900 English words across the visible summary. These are editorial guides, not minimums or validation limits: short episodes should be shorter. Let the renderer estimate reading time from the actual text; never label every output “3–5 minutes” regardless of length.
-- Deliver **`summary.md` and `reader.html`**. The page presents a headline, one-sentence takeaway, confirmed participants, key questions with direct answers, high-value insights, and source references.
+- Deliver **`summary.md` and `reader.html`**. Lead with the core question and concrete key questions, their stakes, the episode's answers and any remaining gaps. Insights explain those questions further; participants and sources provide context.
 - Prefer an existing matching summary bundle unless the user asks to refresh. An old deep report is not a substitute for the requested concise summary.
 - Never claim to have heard or watched content until transcript, captions, or audio were obtained. Titles and descriptions alone are insufficient to summarize an episode.
 - `ready_for_analysis` means source preparation is done, **not that the summary is done**. Continue through Agent synthesis, finalization, and validation.
@@ -72,19 +72,23 @@ python "{skill_dir}/scripts/search_chunks.py" <episode_dir>/chunks.json "<topic 
 
 Spot-check quality warnings, names, numbers, repeated ASR passages, speaker attribution, and any proposed quote. When information cannot be confirmed, omit it or describe the uncertainty.
 
-## 3. Identify key questions and high-value information
+## 3. Identify the questions before writing the answers
 
-The summary must answer important listener questions, not merely list the order of topics.
+Question identification is the main workflow, not a label added to finished conclusions.
 
-1. Identify the episode's central question and its most defensible answer. The headline, takeaway, and first answer sentences should give a useful understanding in the first 30 seconds.
-2. Rank items by how much they change understanding or a decision, then by specificity and evidence. Put the most valuable first; source chronology does not determine reading order.
-3. Use short, concrete questions that explain stakes, decisions, mechanisms, tradeoffs, or a narrative's central conflict. Prefer one question per card over stacked questions or generic headings.
-4. Give a direct first sentence, then the essential reason or boundary, and attach evidence. A Chinese answer will often fit in 30–60 characters; this is a writing target, not a reason to remove a caveat that changes the answer. Keep detailed calculations and procedures for the insights.
-5. Select high-value insights: a counterintuitive finding, a changed assumption, useful data or a case, a concrete method, an important pitfall or boundary, or a genuine disagreement.
-6. Give each insight a distinct job: add a mechanism, a revealing example, usable steps, a source-supported exception, or a meaningful disagreement. Do not retell all the answers in longer paragraphs. If it adds no new understanding, merge or remove it.
-7. Preserve the conditions and caveats that change meaning near the affected claim, rather than hiding them only in the limitations footer. Include unresolved questions only when the episode itself raises and leaves them open.
+1. After reading the complete material, write `digest.core_question`: the specific problem the episode is trying to resolve.
+2. Collect candidate questions from both explicit questions in the source and questions synthesized from substantive discussion. Mark `question_origin` as `explicit` or `synthesized`; a faithful rephrasing of an actual question is explicit, but an Agent-derived question is not a quote.
+3. Rank candidates by impact on understanding or decisions, information value, and meaningful issues the episode actually leaves unresolved. Merge overlapping questions without erasing differences in scope or answer coverage. Do not order merely by timestamps.
+4. Make every question understandable in isolation: retain its subject, tension and relevant conditions. Reject generic questions such as “从哪开始？” / “Where to start?” or “有哪些启示？” / “What are the lessons?”. Do not shorten away the actual problem to hit a character target.
+5. Explain `why_it_matters` using stakes supported by the source. Do not invent audience motives, benefits or harms.
+6. Re-read the response and later follow-ups against the question's full scope. Set `answer_status` to `answered`, `partial`, or `unanswered`. This describes what the episode addresses, not whether its claims are true or externally verified.
+7. Write the answer the source actually gives. For `partial` or `unanswered`, add a nonempty `gap` explaining precisely what is missing; for `answered`, omit `gap`. Do not create a confident answer where the episode leaves one open, or manufacture an unresolved card just to show every status.
+8. Cite the passages supporting the question, its stakes, response and remaining gap. Include every relevant distant passage; a synthesized question cites the discussion from which it was derived.
+9. Only then select insights that deepen these questions with a mechanism, useful example, method, counterintuitive finding, exception or disagreement. Merge or omit anything that merely repeats a question card.
 
 Usually aim for 3–6 key questions and 3–7 insights; use fewer for short or sparse material. Keep narrative, cultural, comedic, or fictional content faithful to its own substance. Do not force business lessons, advice, named participants, statistics, or quotations into every episode.
+
+In the first 30 seconds, the reader should see the core question, why the selected questions matter, and which ones the episode answers. Answers can often fit in 30–60 Chinese characters, but their true scope and decisive caveats take priority over length. Keep important incomplete answers in the question cards, not hidden in an optional footer.
 
 Before writing the final evidence, compare the takeaway, questions, insights, and optional sections side by side. Remove repeated explanations. Keep a quote only if its wording is worth retaining; keep an action only if it adds a useful next step; keep a participant description only if it helps interpret the discussion. Optional sections are not a completion checklist.
 
@@ -94,13 +98,13 @@ Use [references/analysis-workflows.md](references/analysis-workflows.md) for edi
 
 In default `summary` mode, write **`evidence.json` only** as the authored summary source, using [references/output-schema.md](references/output-schema.md). Its `digest` contains:
 
-- `headline`, `takeaway`, and `evidence` supporting the takeaway;
+- `headline`, required `core_question`, `takeaway`, and `evidence` supporting the central question and takeaway;
 - optional source-confirmed `participants`;
-- `quick_takes`: key questions, direct answers, and evidence;
+- `quick_takes`: required `question`, `why_it_matters`, `question_origin`, `answer_status`, `answer`, and `evidence`; also `gap` for partial/unanswered questions, with no `gap` for answered ones;
 - `insights`: titles, explanations, optional concise bullets/kinds, and evidence;
-- optional `open_questions` that the episode actually leaves unresolved.
+- legacy optional `open_questions`; for new summaries, use question cards with answer status and a gap instead of duplicating unresolved questions here.
 
-Keep episode metadata, limitations, and optional short quotes in the existing top-level fields. Every takeaway, answer, and insight needs valid transcript references. Use exact source text for at most three short quotes. Do not invent biographies or infer identity from a voice.
+All newly generated summaries use the question contract, even though older bundles may lack these fields. Keep episode metadata, limitations, and optional short quotes in the existing top-level fields. Every takeaway, question card, and insight needs valid transcript references. Use exact source text for at most three short quotes. Do not invent biographies or infer identity from a voice.
 
 Separate source assertions from Agent synthesis in wording and claim labels. “The guest argues…” is not an external fact check. Do not add external research unless requested; it is not necessary to complete a source-grounded summary.
 

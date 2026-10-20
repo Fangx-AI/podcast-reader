@@ -13,7 +13,7 @@ from runtime_utils import atomic_write_json, load_json_object, skill_version
 
 
 MODES = {
-    "summary": ["one-sentence takeaway", "participants when known", "key questions and direct answers", "high-value insights", "unresolved questions when present", "short exact quotes when useful", "source references", "limitations"],
+    "summary": ["core question", "ranked key questions with origins, stakes and answer coverage", "one-sentence takeaway", "high-value insights supporting those questions", "participants when known", "short exact quotes when useful", "source references", "limitations"],
     "quick": ["episode card", "short summary", "key moments", "limitations"],
     "standard": ["episode card", "executive summary", "chapters", "key ideas", "claims", "actions", "limitations"],
     "deep": ["standard outputs", "argument map", "counterarguments", "claim ledger", "entities", "verification queue", "research questions"],
@@ -55,22 +55,31 @@ def create(episode_dir: Path, mode: str, output_language: str) -> dict:
             "optional_outputs": {},
             "summary_contract": {
                 "schema_reference": "references/output-schema.md",
-                "required_digest_fields": ["headline", "takeaway", "evidence", "quick_takes", "insights"],
+                "question_contract_version": 1,
+                "required_digest_fields": ["headline", "core_question", "takeaway", "evidence", "quick_takes", "insights"],
+                "required_quick_take_fields": ["question", "why_it_matters", "question_origin", "answer_status", "answer", "evidence"],
                 "reading_target": "For substantial episodes, aim for 3–5 minutes and roughly 900–1600 Chinese characters or 500–900 English words across the visible summary. These are editorial targets, not minimums or validation limits. Short episodes should be shorter; the renderer estimates reading time from actual text.",
-                "first_30_seconds": "The headline, takeaway and first answer sentences should convey the central question, answer and major boundary even if the reader stops there. Rank by value to understanding or decisions, then specificity and evidence, rather than source chronology.",
-                "quick_takes": "1–6 short concrete questions, one point each, that the audience needs answered. Lead each answer with a direct sentence, then only the essential reason or boundary and evidence. Chinese answers often fit in 30–60 characters, but preserve decisive caveats. Keep detailed calculations and procedures for insights; avoid table-of-contents questions.",
-                "insights": "1–7 high-value ideas: counterintuitive claims, meaningful data/examples, methods, tradeoffs, pitfalls and limits. Each must add a mechanism, concrete example, usable steps, exception or disagreement beyond the quick answers. Rank by value, retain attribution and put decisive caveats beside the affected claim. Merge or omit ideas that only restate an answer.",
+                "question_workflow": "Read the complete material, write the episode's core_question, collect candidate questions, distinguish explicitly asked questions from synthesized ones, rank by effect on understanding or decisions, information value and genuinely unresolved issues, merge duplicates, then verify the scope of each answer against the full source.",
+                "core_question": "Required for new summaries: one specific, source-grounded question that explains what the episode is trying to resolve. Do not merely reuse a broad topic label or turn the takeaway into a vague question.",
+                "first_30_seconds": "The core question and question cards should reveal what matters, why, and what the episode did or did not answer before the reader studies the insights. Never shorten away the subject, conflict or conditions just to make a tiny card.",
+                "quick_takes": "1–6 concrete questions that remain understandable in isolation, one main problem each. Generic questions such as 'Where to start?' or 'What are the lessons?' are unacceptable. Include why_it_matters, question_origin, answer_status, answer and evidence for each. Lead answers with the episode's actual response, preserve decisive caveats, and explicitly describe missing answers rather than inventing them. Chinese answers may often fit in 30–60 characters, but specificity and source fidelity take priority.",
+                "why_it_matters": "Explain the source-supported stakes of this question in a concise sentence: what understanding, judgment, boundary or unresolved issue depends on it. Do not invent audience motives, benefits, harms or stakes.",
+                "question_origin": "Use explicit when the source clearly asks this question, including a faithful rephrasing; use synthesized when the Agent derives a useful question from the discussion. A synthesized question must not be presented as a speaker's original words.",
+                "answer_status": "Use answered when the episode addresses the actual scope of the question, partial when it answers only part, and unanswered when it offers no answer. This describes episode answer coverage, not factual verification, correctness or confidence. Do not force an unanswered card merely to display every status.",
+                "gap": "Required nonempty gap for partial or unanswered: state exactly what the episode leaves unresolved, without adding an unrelated research agenda. Omit gap for answered questions.",
+                "question_evidence": "References must support the question's origin and stakes, the response and its coverage, including distant follow-ups or explicit unresolved passages. Cite the passages from which a synthesized question is derived.",
+                "insights": "1–7 high-value details that deepen the selected questions: a mechanism, concrete example, usable steps, exception or disagreement. Rank by value, retain attribution and put decisive caveats beside the affected claim. Do not let insight selection replace question identification, and omit details that only repeat an answer.",
                 "insight_kinds": ["decision", "counterintuitive", "data", "method", "pitfall", "insight"],
-                "open_questions": "Optional 0–5 questions the episode raises but does not resolve; distinguish missing answers from your own speculation. Omit if none.",
+                "open_questions": "Legacy optional field only. For new summaries, represent important incomplete or missing answers within quick_takes using answer_status and gap. Do not repeat the same question in open_questions.",
                 "participants": "Include only names, roles and context established by source metadata or transcript; omit unknown identities",
                 "quotes": "0–3 short exact source quotes; omit when unnecessary or untimed",
                 "actions": "Optional, only when supported and useful for this episode's genre",
                 "whole_episode": "Read the complete chunk index in chronological batches before synthesis; cover beginning, middle and ending, then retrieve detail. A top-k search alone cannot summarize an entire episode.",
                 "untimed_sources": "Use segment_ids without timestamps; never invent timing, duration, or speaker identities",
                 "no_padding": "Omit empty or redundant optional sections. Keep participant context, quotes, actions and open questions only when each adds something useful. Do not produce a research report, claim ledger, translation or argument map by default.",
-                "selection_test": "Compare the takeaway, quick answers, insights and optional sections side by side. Would removing an item lose an important answer, new explanation, concrete example or decision boundary? If not, merge or drop it. Preserve qualifications, disagreement and unanswered questions rather than manufacturing certainty.",
+                "selection_test": "Read each question without the title or neighboring cards: are its subject, tension and scope still clear? Compare candidates by decision impact, information value and actual unresolved gaps, merge overlapping questions, then check every answer against the question's full scope. Remove duplicated insights and preserve meaningful uncertainty.",
             },
-            "agent_instruction": "Continue in the current Agent: inspect all transcript chunks, then write evidence.json with a concise, grounded digest in the requested language. Use references/output-schema.md. Run finalize_bundle.py to generate summary.md and reader.html, then validate_bundle.py. Deliver those two files. Transcript acquisition or ready_for_analysis is not a finished summary.",
+            "agent_instruction": "Continue in the current Agent: inspect all transcript chunks, identify the core question, collect and rank explicit/synthesized candidate questions, merge duplicates, and verify answer coverage before writing evidence.json. Every new question card requires why_it_matters, question_origin, answer_status and evidence; partial/unanswered cards require gap. Then add only insights that deepen those questions. Use references/output-schema.md. Run finalize_bundle.py to generate summary.md and reader.html, then validate_bundle.py. Deliver those two files. Transcript acquisition or ready_for_analysis is not a finished summary.",
         })
     output = episode_dir / "analysis-handoff.json"
     atomic_write_json(output, contract)
@@ -79,6 +88,10 @@ def create(episode_dir: Path, mode: str, output_language: str) -> dict:
     bundle["analysis_handoff"] = "analysis-handoff.json"
     bundle["analysis_mode"] = mode
     bundle["output_language"] = output_language
+    if mode == "summary":
+        bundle["question_contract_version"] = 1
+    else:
+        bundle.pop("question_contract_version", None)
     bundle["status"] = "ready_for_analysis"
     bundle.pop("completed_at", None)
     bundle["next_actions"] = [

@@ -7,6 +7,7 @@ import argparse
 import html
 import math
 import re
+import unicodedata
 from typing import Any
 from urllib.parse import quote, urlsplit
 
@@ -19,7 +20,9 @@ PLACEHOLDER = re.compile(
     r"<(?:insert|replace|填写|填入)[^>]*>",
     re.IGNORECASE,
 )
-DIGEST_FIELDS = {"headline", "takeaway", "evidence", "participants", "quick_takes", "insights", "open_questions"}
+DIGEST_FIELDS = {"headline", "core_question", "takeaway", "evidence", "participants", "quick_takes", "insights", "open_questions"}
+QUESTION_ORIGINS = {"explicit", "synthesized"}
+ANSWER_STATUSES = {"answered", "partial", "unanswered"}
 INSIGHT_KINDS = {
     "decision": "决策判断", "counterintuitive": "反直觉观点", "data": "关键数据",
     "method": "具体方法", "pitfall": "需要避开的坑", "insight": "重要洞察",
@@ -81,6 +84,14 @@ def _duration(segments: dict[int, dict[str, Any]]) -> float:
     )
 
 
+def _question_key(value: str) -> str:
+    """Catch literal duplicates without trying to infer semantic equivalence."""
+    return "".join(
+        character for character in unicodedata.normalize("NFKC", value).casefold()
+        if not character.isspace() and not unicodedata.category(character).startswith("P")
+    )
+
+
 def _reference(reference: Any, segments: dict[int, dict[str, Any]], duration: float,
                label: str, errors: list[str]) -> set[int]:
     if not isinstance(reference, dict):
@@ -120,7 +131,8 @@ def _reference(reference: Any, segments: dict[int, dict[str, Any]], duration: fl
     return found
 
 
-def validate_digest(evidence: Any, transcript: Any, required: bool = False) -> dict[str, Any]:
+def validate_digest(evidence: Any, transcript: Any, required: bool = False, *,
+                    require_questions: bool = False) -> dict[str, Any]:
     """Check the optional digest; require it when finalizing a new summary bundle.
 
     This supplements validate_evidence: quote exactness and legacy evidence
@@ -137,7 +149,7 @@ def validate_digest(evidence: Any, transcript: Any, required: bool = False) -> d
         errors.append("evidence root must be an object")
         return result()
     if "digest" not in evidence:
-        if required:
+        if required or require_questions:
             errors.append("digest is required for a concise summary")
         return result()
     digest = evidence["digest"]
@@ -192,6 +204,9 @@ def validate_digest(evidence: Any, transcript: Any, required: bool = False) -> d
             text(episode.get(field), f"episode.{field}", maximum, optional=True)
     fields(digest, DIGEST_FIELDS, "digest")
     text(digest.get("headline"), "digest.headline", 120)
+    question_first = require_questions or "core_question" in digest
+    if question_first:
+        text(digest.get("core_question"), "digest.core_question", 160)
     text(digest.get("takeaway"), "digest.takeaway", 400)
     refs(digest.get("evidence"), "digest.evidence")
     for index, item in enumerate(items(digest.get("participants"), "digest.participants", 8, nullable=True)):
@@ -203,14 +218,34 @@ def validate_digest(evidence: Any, transcript: Any, required: bool = False) -> d
         text(item.get("name"), f"{label}.name", 100)
         text(item.get("role"), f"{label}.role", 100, optional=True)
         text(item.get("description"), f"{label}.description", 300, optional=True)
+    seen_questions: dict[str, int] = {}
     for index, item in enumerate(items(digest.get("quick_takes"), "digest.quick_takes", 6, minimum=1)):
         label = f"digest.quick_takes[{index}]"
         if not isinstance(item, dict):
             errors.append(f"{label}: must be an object")
             continue
-        fields(item, {"question", "answer", "evidence"}, label)
+        fields(item, {"question", "answer", "evidence", "why_it_matters", "question_origin", "answer_status", "gap"}, label)
         text(item.get("question"), f"{label}.question", 160)
         text(item.get("answer"), f"{label}.answer", 500)
+        if isinstance(item.get("question"), str):
+            question_key = _question_key(item["question"])
+            if question_key in seen_questions:
+                errors.append(f"{label}.question: duplicates quick_takes[{seen_questions[question_key]}] after whitespace/punctuation normalization")
+            else:
+                seen_questions[question_key] = index
+        if question_first or "why_it_matters" in item:
+            text(item.get("why_it_matters"), f"{label}.why_it_matters", 300)
+        for field, allowed in (("question_origin", QUESTION_ORIGINS), ("answer_status", ANSWER_STATUSES)):
+            if question_first or field in item:
+                if not isinstance(item.get(field), str) or item[field] not in allowed:
+                    errors.append(f"{label}.{field}: must be one of {sorted(allowed)}")
+        status = item.get("answer_status")
+        if isinstance(status, str) and status in {"partial", "unanswered"}:
+            text(item.get("gap"), f"{label}.gap", 300)
+        else:
+            text(item.get("gap"), f"{label}.gap", 300, optional=True)
+        if status == "answered" and isinstance(item.get("gap"), str) and item["gap"].strip():
+            errors.append(f"{label}.gap: must be empty when answer_status is answered")
         refs(item.get("evidence"), f"{label}.evidence")
     for index, item in enumerate(items(digest.get("insights"), "digest.insights", 7, minimum=1)):
         label = f"digest.insights[{index}]"
@@ -357,12 +392,43 @@ def render_markdown(evidence: dict[str, Any], bundle: dict[str, Any],
     if not metadata:
         metadata.append(label("转写材料", "Transcript"))
     lines = [f"# {_escape(digest['headline'])}", ""]
+    if digest.get("core_question"):
+        lines.extend([
+            label("## 本期核心问题", "## The episode's core question"), "",
+            _escape(digest["core_question"]), "",
+            label("原文出处：", "Source evidence: ") + _citations(digest["evidence"], segments, english), "",
+        ])
+    status_labels = (
+        {"answered": "Answered", "partial": "Partly answered", "unanswered": "Unanswered"} if english else
+        {"answered": "已回答", "partial": "部分回答", "unanswered": "尚未回答"}
+    )
+    origin_labels = (
+        {"explicit": "Explicitly raised in the episode", "synthesized": "Synthesized from the episode's discussion"} if english else
+        {"explicit": "节目明确提出", "synthesized": "根据节目讨论归纳"}
+    )
+    lines.extend([label("## 本期问题清单", "## Questions in this episode"), ""])
+    for number, item in enumerate(digest["quick_takes"], 1):
+        status = item.get("answer_status")
+        status_text = label(" — 节目回答状态：", " — Episode answer status: ") + status_labels[status] if status in status_labels else ""
+        lines.append(f"{number}. {_escape(item['question'])}{status_text}")
+    lines.append("")
     lines.extend([label("## 一句话总结", "## One-sentence takeaway"), "", _escape(digest["takeaway"]), "",
                   _citations(digest["evidence"], segments, english), ""])
-    lines.extend([label("## 关键问题 · 直接看答案", "## Key questions · Direct answers"), ""])
-    for item in digest["quick_takes"]:
-        lines.extend([f"### {_escape(item['question'])}", "", _escape(item["answer"]), "",
-                      _citations(item["evidence"], segments, english), ""])
+    lines.extend([label("## 关键问题 · 逐题解读", "## Key questions · Answers and gaps"), ""])
+    for number, item in enumerate(digest["quick_takes"], 1):
+        lines.extend([f"### {number}. {_escape(item['question'])}", ""])
+        if item.get("question_origin"):
+            lines.extend([label("问题来源：", "Question origin: ") + origin_labels[item["question_origin"]], ""])
+        if item.get("why_it_matters"):
+            lines.extend([label("**为什么重要：** ", "**Why it matters:** ") + _escape(item["why_it_matters"]), ""])
+        status = item.get("answer_status")
+        answer_label = label("**节目回答", "**Episode answer")
+        if status in status_labels:
+            answer_label += label("（", " (") + status_labels[status] + label("）", ")")
+        lines.extend([answer_label + label("：** ", ":** ") + _escape(item["answer"]), ""])
+        if item.get("gap"):
+            lines.extend([label("**仍缺什么：** ", "**What remains missing:** ") + _escape(item["gap"]), ""])
+        lines.extend([label("原文出处：", "Source evidence: ") + _citations(item["evidence"], segments, english), ""])
     lines.extend([label("## 高价值信息", "## High-value insights"), ""])
     for number, item in enumerate(digest["insights"], 1):
         kind_labels = ENGLISH_INSIGHT_KINDS if english else INSIGHT_KINDS

@@ -10,6 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from render_reader import render, timestamp_url
+from summary_digest import render_markdown
 
 
 class PageStructure(HTMLParser):
@@ -20,9 +21,16 @@ class PageStructure(HTMLParser):
         self.source_sections = []
         self.hrefs = []
         self.scripts = 0
+        self.ids = []
+        self.markdown = []
+        self.in_markdown = False
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if attrs.get("id"):
+            self.ids.append(attrs["id"])
+        if tag == "pre" and attrs.get("id") == "summary-markdown":
+            self.in_markdown = True
         if tag == "details":
             self.in_details = True
             self.details_open.append("open" in attrs)
@@ -36,12 +44,18 @@ class PageStructure(HTMLParser):
             self.scripts += 1
 
     def handle_endtag(self, tag):
+        if tag == "pre":
+            self.in_markdown = False
         if tag == "details":
             self.in_details = False
 
+    def handle_data(self, data):
+        if self.in_markdown:
+            self.markdown.append(data)
+
 
 class SummaryReaderTests(unittest.TestCase):
-    def build(self, root, evidence, *, untimed=False, source="https://www.youtube.com/watch?v=example", extra=None, handoff=None, include_transcript=True, transcript_segments=None):
+    def build(self, root, evidence, *, untimed=False, source="https://www.youtube.com/watch?v=example", extra=None, handoff=None, include_transcript=True, transcript_segments=None, finalized=None):
         segment = {"segment_id": 1, "speaker": "嘉宾", "text": "可靠评估让产品真正可用。"}
         if not untimed:
             segment.update(start="00:01:30", end="00:02:00", start_seconds=90, end_seconds=120)
@@ -54,7 +68,7 @@ class SummaryReaderTests(unittest.TestCase):
             documents["analysis-handoff.json"] = handoff
         for name, document in documents.items():
             (root / name).write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
-        result = render(root, root / "reader.html", include_transcript=include_transcript)
+        result = render(root, root / "reader.html", include_transcript=include_transcript, finalized=finalized)
         page = (root / "reader.html").read_text(encoding="utf-8")
         parsed = PageStructure()
         parsed.feed(page)
@@ -84,6 +98,8 @@ class SummaryReaderTests(unittest.TestCase):
         self.assertIn("方法步骤", page)
         self.assertIn("评估如何覆盖未知场景？", page)
         self.assertLess(page.index('id="quick-title"'), page.index('id="source-details"'))
+        self.assertLess(page.index('id="insights-title"'), page.index('id="participants-title"'))
+        self.assertEqual(len(parsed.ids), len(set(parsed.ids)))
         self.assertEqual(parsed.details_open, [False])
         self.assertEqual(parsed.source_sections, [True, True])
         self.assertTrue(any("t=90s" in url for url in parsed.hrefs))
@@ -176,10 +192,70 @@ class SummaryReaderTests(unittest.TestCase):
         self.assertNotIn("可靠评估让产品真正可用。", page)
         self.assertNotIn('id="transcript-title"', page)
         self.assertNotIn('id="search"', page)
-        self.assertEqual(parsed.scripts, 0)
+        self.assertEqual(parsed.scripts, 1)  # Standalone toolbar/navigation still work.
+        self.assertNotIn("const revealSource=", page)
+        self.assertNotIn("const filter=", page)
         self.assertFalse(any(value.startswith("#segment-") for value in parsed.hrefs))
         self.assertIn("展开节目章节", page)
         self.assertIn("分享摘要", page)
+
+    def test_copied_and_downloaded_summary_match_canonical_markdown(self):
+        evidence = {"digest": {
+            "headline": "选工具之前，先做什么？",
+            "takeaway": "先建立可靠评估。",
+            "evidence": [{"segment_ids": [1]}],
+            "quick_takes": [{"question": "先做什么？", "answer": "建立评估", "evidence": [{"segment_ids": [1]}]}],
+            "insights": [{"title": "按实际任务评估", "summary": "用失败案例定位问题", "evidence": [{"segment_ids": [1]}]}],
+        }}
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            _, page, parsed = self.build(root, evidence, extra={"status": "analyzed", "output_language": "zh-CN"})
+            expected = render_markdown(
+                evidence,
+                json.loads((root / "bundle.json").read_text(encoding="utf-8")),
+                json.loads((root / "transcript.json").read_text(encoding="utf-8")),
+            )
+        self.assertEqual("".join(parsed.markdown), expected)
+        self.assertIn("copy-summary", parsed.ids)
+        self.assertIn("download-summary", parsed.ids)
+        self.assertNotIn("可靠评估让产品真正可用。", "".join(parsed.markdown))
+        self.assertIn('aria-live="polite"', page)
+
+    def test_embedded_markdown_cannot_break_out_into_active_html(self):
+        payload = '</pre><script>alert("x")</script><textarea>'
+        with tempfile.TemporaryDirectory() as folder:
+            _, page, parsed = self.build(Path(folder), {"summary": payload}, include_transcript=False)
+        self.assertEqual(parsed.scripts, 1)
+        self.assertNotIn(payload, page)
+        self.assertTrue(parsed.markdown)
+        self.assertNotIn("可靠评估让产品真正可用。", "".join(parsed.markdown))
+
+    def test_reading_estimate_excludes_transcript_and_labels_original_duration(self):
+        evidence = {"summary": "用一个任务开始。", "episode": {"duration_seconds": 3600}}
+        pages = []
+        for text in ("一段原文", "非常长的原文" * 20000):
+            with tempfile.TemporaryDirectory() as folder:
+                _, page, _ = self.build(Path(folder), evidence, transcript_segments=[{"segment_id": 1, "text": text}])
+                pages.append(page)
+        for page in pages:
+            self.assertIn("约 1 分钟读完", page)
+            self.assertIn("原节目 60 分钟", page)
+
+    def test_absent_summary_does_not_offer_fake_export_or_reading_estimate(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, page, parsed = self.build(Path(folder), {}, extra={"status": "ready_for_analysis"})
+        self.assertNotIn("copy-summary", parsed.ids)
+        self.assertNotIn("download-summary", parsed.ids)
+        self.assertNotIn("summary-markdown", parsed.ids)
+        self.assertNotIn("分钟读完", page)
+        self.assertIn("总结尚未生成", page)
+
+    def test_pending_summary_is_marked_until_finalizer_has_validated_it(self):
+        for finalized in (None, True):
+            with self.subTest(finalized=finalized), tempfile.TemporaryDirectory() as folder:
+                _, page, parsed = self.build(Path(folder), {"summary": "旧版摘要"}, extra={"status": "ready_for_analysis"}, finalized=finalized)
+            self.assertEqual("copy-summary" in parsed.ids, finalized is True)
+            self.assertEqual("这份摘要尚未完成校验" in page, finalized is not True)
 
     def test_timestamp_urls_are_supported_and_strictly_validated(self):
         self.assertIn("t=90s", timestamp_url("https://www.youtube.com/watch?v=x&t=12&start=4", 90))

@@ -18,6 +18,7 @@ Resolve `{skill_dir}` to this skill's directory. Run helpers as `python "{skill_
 ## User contract
 
 - A link alone is enough. Default to `summary`, use the user's language, and aim for a 3–5 minute read. Do not ask the user to choose an analysis mode.
+- For a substantial episode, target roughly 900–1,600 Chinese characters or 500–900 English words across the visible summary. These are editorial guides, not minimums or validation limits: short episodes should be shorter. Let the renderer estimate reading time from the actual text; never label every output “3–5 minutes” regardless of length.
 - Deliver **`summary.md` and `reader.html`**. The page presents a headline, one-sentence takeaway, confirmed participants, key questions with direct answers, high-value insights, and source references.
 - Prefer an existing matching summary bundle unless the user asks to refresh. An old deep report is not a substitute for the requested concise summary.
 - Never claim to have heard or watched content until transcript, captions, or audio were obtained. Titles and descriptions alone are insufficient to summarize an episode.
@@ -75,14 +76,17 @@ Spot-check quality warnings, names, numbers, repeated ASR passages, speaker attr
 
 The summary must answer important listener questions, not merely list the order of topics.
 
-1. Identify the episode's central question and its most defensible answer.
-2. Select questions that explain stakes, decisions, mechanisms, tradeoffs, or a narrative's central conflict. Prefer concrete questions over generic headings such as “What did they discuss?”
-3. Answer each question directly, retain the essential reason or example, and attach evidence.
-4. Select high-value insights: a counterintuitive finding, a changed assumption, useful data or a case, a concrete method, an important pitfall or boundary, or a genuine disagreement.
-5. Explain **why each selected item matters**. Preserve the conditions and caveats that could change the answer. Do not repeat a Q&A answer as a second insight without adding substance.
-6. Include unresolved questions only when the episode itself raises and leaves them open. Do not invent an external research agenda.
+1. Identify the episode's central question and its most defensible answer. The headline, takeaway, and first answer sentences should give a useful understanding in the first 30 seconds.
+2. Rank items by how much they change understanding or a decision, then by specificity and evidence. Put the most valuable first; source chronology does not determine reading order.
+3. Use short, concrete questions that explain stakes, decisions, mechanisms, tradeoffs, or a narrative's central conflict. Prefer one question per card over stacked questions or generic headings.
+4. Give a direct first sentence, then the essential reason or boundary, and attach evidence. A Chinese answer will often fit in 30–60 characters; this is a writing target, not a reason to remove a caveat that changes the answer. Keep detailed calculations and procedures for the insights.
+5. Select high-value insights: a counterintuitive finding, a changed assumption, useful data or a case, a concrete method, an important pitfall or boundary, or a genuine disagreement.
+6. Give each insight a distinct job: add a mechanism, a revealing example, usable steps, a source-supported exception, or a meaningful disagreement. Do not retell all the answers in longer paragraphs. If it adds no new understanding, merge or remove it.
+7. Preserve the conditions and caveats that change meaning near the affected claim, rather than hiding them only in the limitations footer. Include unresolved questions only when the episode itself raises and leaves them open.
 
 Usually aim for 3–6 key questions and 3–7 insights; use fewer for short or sparse material. Keep narrative, cultural, comedic, or fictional content faithful to its own substance. Do not force business lessons, advice, named participants, statistics, or quotations into every episode.
+
+Before writing the final evidence, compare the takeaway, questions, insights, and optional sections side by side. Remove repeated explanations. Keep a quote only if its wording is worth retaining; keep an action only if it adds a useful next step; keep a participant description only if it helps interpret the discussion. Optional sections are not a completion checklist.
 
 Use [references/analysis-workflows.md](references/analysis-workflows.md) for editorial selection and [assets/analysis-template.md](assets/analysis-template.md) for the intended reading experience.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import html
 import json
 import os
 from pathlib import Path
@@ -14,30 +15,44 @@ import sys
 import tempfile
 from typing import Any
 import urllib.parse
+import uuid
 import zipfile
 
 from runtime_utils import atomic_write_json, atomic_write_text, sha256_file, skill_version
 from render_reader import render as render_reader
+from validate_bundle import validate as validate_bundle
 
 
 SENSITIVE_QUERY = re.compile(r"(?:token|sig(?:nature)?|auth|secret|session|jwt|key|policy|expires?|credential|hdnea)", re.I)
-ABSOLUTE_PATH = re.compile(r"(?:(?:[A-Za-z]:[\\/])|/Users/|/home/)[^\s\"'<>]+")
+ABSOLUTE_PATH = re.compile(r"(?<![A-Za-z0-9])(?:(?:[A-Za-z]:[\\/])|/Users/|/home/)[^\s\"'<>]+")
+# Escaped tag/quote delimiters belong to the surrounding HTML, not the URL.
+# In particular, the hidden Markdown payload wraps link targets in &lt;/&gt;.
+WEB_URL = re.compile(r"https?://(?:(?!&(?:lt|gt|quot|apos|#(?:\d+|x[0-9a-f]+));)[^\s\"'<>])+", re.I)
 ALWAYS = {"bundle.json", "source.json", "source-info.json", "analysis.md", "summary.md", "evidence.json", "reader.html", "analysis-handoff.json"}
 KNOWLEDGE = {"transcript.json", "transcript.md", "transcript.srt", "transcript.vtt", "chunks.json"}
 
 
 def sanitized_url(value: str) -> str:
     parsed = urllib.parse.urlsplit(value)
-    if parsed.scheme not in {"http", "https"}:
+    if parsed.scheme.lower() not in {"http", "https"}:
         return value
     query = [
-        (key, "[REDACTED]" if SENSITIVE_QUERY.search(key) else item)
+        (key, item)
         for key, item in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-        if not key.casefold().startswith("utm_") and key.casefold() not in {"fbclid", "gclid"}
+        if not SENSITIVE_QUERY.search(key)
+        and not key.casefold().startswith("utm_") and key.casefold() not in {"fbclid", "gclid"}
     ]
     host = parsed.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
     port = f":{parsed.port}" if parsed.port else ""
-    return urllib.parse.urlunsplit((parsed.scheme, host + port, parsed.path, urllib.parse.urlencode(query), ""))
+    fragment = parsed.fragment
+    if "=" in fragment:
+        fragment = urllib.parse.urlencode([
+            (key, item) for key, item in urllib.parse.parse_qsl(fragment, keep_blank_values=True)
+            if not SENSITIVE_QUERY.search(key)
+        ])
+    return urllib.parse.urlunsplit((parsed.scheme, host + port, parsed.path, urllib.parse.urlencode(query), fragment))
 
 
 def sanitize_value(value: Any, episode_dir: Path, key: str = "") -> Any:
@@ -47,7 +62,7 @@ def sanitize_value(value: Any, episode_dir: Path, key: str = "") -> Any:
         return [sanitize_value(child, episode_dir, key) for child in value]
     if not isinstance(value, str):
         return value
-    if value.startswith(("http://", "https://")):
+    if value.lower().startswith(("http://", "https://")) and not re.search(r"\s", value):
         return sanitized_url(value)
     candidate = Path(value).expanduser()
     if candidate.is_absolute():
@@ -55,14 +70,39 @@ def sanitize_value(value: Any, episode_dir: Path, key: str = "") -> Any:
             return candidate.resolve().relative_to(episode_dir).as_posix()
         except (ValueError, OSError):
             return f"[LOCAL_PATH_REDACTED]/{candidate.name}"
-    return value
+    return sanitize_text(value, episode_dir)
 
 
 def sanitize_text(value: str, episode_dir: Path) -> str:
+    # Protect web URLs before masking paths: "https:/" contains a drive-like
+    # suffix, and legitimate web paths can themselves contain "/Users/".
+    urls: list[str] = []
+    prefix = f"\x00podcast-url-{uuid.uuid4().hex}-"
+
+    def protect_url(match: re.Match[str]) -> str:
+        original = match.group(0)
+        core = original.rstrip(".,;!?}")
+        for opening, closing in (("(", ")"), ("[", "]")):
+            while core.endswith(closing) and core.count(closing) > core.count(opening):
+                core = core[:-1]
+        suffix = original[len(core):]
+        escaped_html = "&amp;" in core.lower()
+        # Decode only query separators. Unescaping quotes or angle brackets
+        # here would turn already-safe HTML text back into active markup.
+        cleaned = sanitized_url(re.sub(r"&amp;", "&", core, flags=re.I))
+        if escaped_html:
+            cleaned = html.escape(cleaned, quote=True)
+        urls.append(cleaned + suffix)
+        return f"{prefix}{len(urls) - 1}\x00"
+
+    value = WEB_URL.sub(protect_url, value)
     root_forms = {str(episode_dir), str(episode_dir).replace("\\", "/")}
     for root in sorted(root_forms, key=len, reverse=True):
         value = value.replace(root, ".")
-    return ABSOLUTE_PATH.sub("[LOCAL_PATH_REDACTED]", value)
+    value = ABSOLUTE_PATH.sub("[LOCAL_PATH_REDACTED]", value)
+    for index, url in enumerate(urls):
+        value = value.replace(f"{prefix}{index}\x00", url)
+    return value
 
 
 def selected_files(episode_dir: Path, profile: str, include_full_transcript: bool) -> list[Path]:
@@ -95,6 +135,13 @@ def export(episode_dir: Path, output: Path, profile: str, include_full_transcrip
     output = output.expanduser().resolve()
     if not (episode_dir / "bundle.json").is_file():
         raise FileNotFoundError("bundle.json is missing")
+    bundle = json.loads((episode_dir / "bundle.json").read_text(encoding="utf-8-sig"))
+    if profile in {"share", "portable"}:
+        if not isinstance(bundle, dict) or bundle.get("status") != "analyzed":
+            raise ValueError("Complete the summary with finalize_bundle.py before sharing or creating a portable export.")
+        validation = validate_bundle(episode_dir)
+        if not validation["valid"]:
+            raise ValueError("The summary is incomplete or stale; run finalize_bundle.py first: " + "; ".join(validation["errors"]))
     files = selected_files(episode_dir, profile, include_full_transcript)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="podcast-reader-export-") as temporary_folder:
@@ -107,6 +154,8 @@ def export(episode_dir: Path, output: Path, profile: str, include_full_transcrip
             if source.name == "reader.html" and not include_full_transcript:
                 # A collapsed transcript is still the complete text in the HTML.
                 # Render the summary alone for the default share export.
+                if not (episode_dir / "transcript.json").is_file():
+                    raise FileNotFoundError("transcript.json is required to build an export without the embedded transcript.")
                 render_reader(episode_dir, target, include_transcript=False)
                 atomic_write_text(target, sanitize_text(target.read_text(encoding="utf-8"), episode_dir))
             elif source.suffix.lower() == ".json":
@@ -119,6 +168,15 @@ def export(episode_dir: Path, output: Path, profile: str, include_full_transcrip
                 atomic_write_text(target, sanitize_text(source.read_text(encoding="utf-8", errors="replace"), episode_dir))
             else:
                 shutil.copy2(source, target)
+        exported_bundle_path = staging / "bundle.json"
+        exported_bundle = json.loads(exported_bundle_path.read_text(encoding="utf-8-sig"))
+        if isinstance(exported_bundle, dict) and isinstance(exported_bundle.get("deliverable_hashes"), dict):
+            exported_bundle["deliverable_hashes"] = {
+                name: sha256_file(staging / name)
+                for name in ("summary.md", "reader.html")
+                if (staging / name).is_file()
+            }
+            atomic_write_json(exported_bundle_path, exported_bundle)
         manifest_files = []
         for path in sorted(staging.rglob("*")):
             if path.is_file():

@@ -14,6 +14,8 @@ from typing import Any
 import urllib.parse
 
 from runtime_utils import atomic_write_text
+from reader_ui import STYLE, TOOLBAR_SCRIPT, TRANSCRIPT_SCRIPT
+from summary_digest import render_markdown
 
 
 def safe_source_url(value: Any) -> str | None:
@@ -112,6 +114,21 @@ LABELS = {
         "count_all": "共 {n} 段", "count_match": "找到 {n} 段", "evidence_missing": "未提供原文定位",
         "decision": "决策依据", "counterintuitive": "反直觉", "data": "关键数据",
         "method": "方法步骤", "pitfall": "避坑提醒", "insight": "关键洞察",
+        "copy": "复制摘要", "save": "保存摘要", "copied": "摘要已复制，可直接粘贴分享。",
+        "copy_manual": "无法自动复制。请复制下面已选中的文字。",
+        "copy_help": "使用 Ctrl+C（Mac 为 ⌘C），或长按选中文字进行复制。",
+        "copy_close": "收起", "copy_text": "摘要全文", "saved": "已开始保存 Markdown 摘要。",
+        "save_failed": "无法自动保存，请复制下方摘要后自行保存。",
+        "nav": "摘要目录", "nav_quick": "关键问题", "nav_insights": "高价值信息",
+        "nav_quotes": "精选原话", "nav_open_questions": "未解问题", "nav_source": "查看原文",
+        "clear": "清除", "reset": "清除搜索", "empty_title": "没有找到匹配内容",
+        "empty_help": "试试更短的关键词，或清除搜索查看完整逐字稿。",
+        "return": "返回刚才的摘要", "top": "回到顶部", "view_text": "查看原文",
+        "view_episode": "回听此处", "reading": "约 {n} 分钟读完", "duration": "原节目 {n} 分钟",
+        "questions_count": "{n} 个关键问题", "insights_count": "{n} 条高价值信息",
+        "reading_basis": "按摘要正文约 400 中文字或 200 英文词／分钟估算，不含逐字稿。",
+        "pending_title": "总结尚未生成", "stale": "这份摘要尚未完成校验，内容可能仍在更新。",
+        "reference": "依据",
     },
     "en": {
         "language": "en", "brand": "PODCAST, CONDENSED", "takeaway": "The takeaway",
@@ -127,42 +144,74 @@ LABELS = {
         "count_all": "{n} segments", "count_match": "{n} matches", "evidence_missing": "No source location supplied",
         "decision": "Decision basis", "counterintuitive": "Counterintuitive", "data": "Key data",
         "method": "Practical method", "pitfall": "Pitfall", "insight": "Key insight",
+        "copy": "Copy summary", "save": "Save summary", "copied": "Summary copied. Ready to paste and share.",
+        "copy_manual": "Automatic copying is unavailable. Copy the selected text below.",
+        "copy_help": "Press Ctrl+C (⌘C on Mac), or touch and hold the selected text to copy.",
+        "copy_close": "Close", "copy_text": "Full summary", "saved": "Markdown summary download started.",
+        "save_failed": "Automatic saving is unavailable. Copy the summary below and save it.",
+        "nav": "Summary sections", "nav_quick": "Key questions", "nav_insights": "Insights",
+        "nav_quotes": "Quotes", "nav_open_questions": "Open questions", "nav_source": "Source",
+        "clear": "Clear", "reset": "Clear search", "empty_title": "No matching passages",
+        "empty_help": "Try a shorter keyword, or clear the search to see the full transcript.",
+        "return": "Back to the summary", "top": "Back to top", "view_text": "View source",
+        "view_episode": "Listen here", "reading": "About {n} min to read", "duration": "Original episode · {n} min",
+        "questions_count": "{n} key questions", "insights_count": "{n} insights",
+        "reading_basis": "Estimated at 400 Chinese characters or 200 English words per minute; transcript excluded.",
+        "pending_title": "Summary not yet generated", "stale": "This summary has not finished validation and may still be updated.",
+        "reference": "Source",
     },
 }
 
 
-STYLE = """
-:root{color-scheme:dark;--bg:#0b0e13;--panel:#12161e;--panel-soft:#10141b;--ink:#e8e8e5;--muted:#969ba5;--gold:#e8c66b;--line:#262b34;--focus:#f5d67e}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.8 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
-a{color:var(--gold);text-decoration:none}a:hover{text-decoration:underline}a:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:5px}
-.skip{position:absolute;left:-9999px}.skip:focus{left:16px;top:16px;background:var(--panel);padding:10px;z-index:2}
-.page{max-width:900px;margin:0 auto;padding:48px 32px 26px}.hero{text-align:center;padding:0 26px 34px;border-bottom:1px solid var(--line)}
-.eyebrow{display:inline-block;border:1px solid #6a572d;border-radius:30px;padding:2px 14px;font-size:10px;letter-spacing:.24em;color:var(--gold)}
-h1{font-size:clamp(27px,4.5vw,42px);line-height:1.45;font-weight:750;letter-spacing:.015em;color:var(--gold);margin:21px auto 15px;max-width:740px;text-wrap:balance}
-.episode-title{font-size:12px;color:var(--muted);margin:0 auto 12px;max-width:660px}.metadata{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--muted)}
-.metadata span,.metadata a{border:1px solid var(--line);border-radius:4px;padding:2px 9px}.takeaway{margin:25px auto 0;max-width:680px;text-align:left;border-left:2px solid var(--gold);padding:3px 0 3px 17px}
-.kicker{color:var(--gold);font-size:11px;letter-spacing:.08em;font-weight:650}.takeaway p{font-size:16px;margin:5px 0 0;line-height:1.8}
-section{margin-top:31px}h2{font-size:17px;letter-spacing:.035em;margin:0 0 14px;padding-left:11px;border-left:3px solid var(--gold);line-height:1.25;color:var(--gold)}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:19px 20px;min-width:0}
-.card h3{font-size:16px;line-height:1.6;color:var(--gold);margin:0 0 7px}.card p{margin:5px 0;font-size:13px;line-height:1.8}.participant .role{font-size:11px;color:var(--muted)}.participant p{color:#c2c5cc}
-.quick-card .question{font-size:11px;color:var(--muted);margin-bottom:6px}.quick-card .answer{font-size:15px;line-height:1.65;font-weight:650;color:var(--gold)}
-.insight{margin-top:12px}.insight:first-child{margin-top:0}.insight-heading{display:flex;gap:11px;align-items:baseline;flex-wrap:wrap}.index{font:12px/1.5 ui-monospace,monospace;color:#8d7847}.kind{font-size:10px;color:var(--muted);border:1px solid var(--line);padding:0 6px;border-radius:4px}
-.insight ul,.open-questions ul{margin:9px 0 0;padding-left:18px;font-size:13px}.insight li,.open-questions li{padding-left:2px;margin:5px 0}.insight li::marker,.open-questions li::marker{color:var(--gold)}
-.evidence{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px;font:10px/1.7 ui-monospace,monospace;color:var(--muted)}.evidence a,.evidence span{padding:1px 6px;border:1px solid var(--line);border-radius:4px}.evidence a{color:#bda562}
-blockquote{margin:0;padding:1px 0 1px 16px;border-left:2px solid #776232}blockquote p{font-size:16px!important;line-height:1.8!important}blockquote cite{font-size:11px;color:var(--muted);font-style:normal}
-.quote+.quote,.action+.action{margin-top:12px}.action .context{color:var(--muted);font-size:12px}.limitations{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:16px}.limitations ul{margin:0;padding-left:18px}
-.source-details{margin-top:30px;border:1px solid var(--line);border-radius:9px;background:var(--panel-soft)}.source-details>summary{padding:17px 20px;cursor:pointer;color:var(--muted);font-size:13px}.source-content{padding:0 20px 20px}
-.source-content h2{font-size:14px}.source-content section{margin-top:20px}.chapters{padding-left:20px;font-size:12px}.chapters li{margin:12px 0}.chapters p{color:var(--muted);margin:3px 0}
-label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}input{display:block;width:100%;font:inherit;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:10px 13px}#result-count{font-size:11px;color:var(--muted);margin:8px 0}
-.segment{display:grid;grid-template-columns:82px 1fr;gap:14px;padding:14px 0;border-top:1px solid var(--line);font-size:12px}.segment[hidden]{display:none}.stamp{font:10px/1.8 ui-monospace,monospace;color:var(--muted)}.speaker{font-size:11px;color:var(--gold)}.segment p{margin:0;white-space:pre-wrap}.segment:target{background:#282315;outline:1px solid var(--gold);scroll-margin-top:20px}
-footer{text-align:center;margin-top:30px;color:#737985;font-size:10px;letter-spacing:.04em}.card,.takeaway,blockquote{overflow-wrap:anywhere}
-@media(max-width:600px){.page{padding:30px 18px 22px}.hero{padding:0 0 25px}h1{font-size:27px}.grid{gap:9px}.card{padding:15px 14px}.quick-card .answer{font-size:13px}.card h3{font-size:14px}.takeaway p{font-size:14px}section{margin-top:26px}h2{font-size:15px}.segment{grid-template-columns:1fr;gap:3px}.metadata{gap:5px}.source-content{padding:0 14px 16px}}
-@media(max-width:380px){.grid{grid-template-columns:1fr}}
-@media print{:root{color-scheme:light;--bg:#fff;--panel:#fff;--panel-soft:#fff;--ink:#171717;--muted:#555;--gold:#70521b;--line:#ddd}body{font-size:10pt}.page{max-width:none;padding:0}.hero{padding-bottom:20px}h1{font-size:25pt}.card,blockquote,.takeaway{break-inside:avoid;box-shadow:none}.card{border-color:#ddd}section{margin-top:20px}.source-details{display:none}.metadata a{display:none}a{color:inherit}.skip{display:none}footer{color:#777}.evidence a{color:#70521b}.participant p{color:#333}}
-"""
+def markdown_summary(evidence: dict[str, Any], bundle: dict[str, Any], transcript: dict[str, Any],
+                     title: str, takeaway: str, labels: dict[str, str]) -> str:
+    """Embed the canonical summary when valid; keep legacy exports concise."""
+    try:
+        return render_markdown(evidence, {**bundle, "output_language": labels["language"]}, transcript)
+    except (ValueError, TypeError, KeyError):
+        pass
+    def literal(value: Any) -> str:
+        value = html.escape(str(value or ""), quote=False)
+        return re.sub(r"([\\`*_{}\[\]()#+.!|~-])", r"\\\1", value)
+    digest = evidence.get("digest") if isinstance(evidence.get("digest"), dict) else {}
+    lines = [f"# {literal(title)}", "", f"## {labels['takeaway']}", "", literal(takeaway), ""]
+    for item in records(digest.get("quick_takes")):
+        if item.get("question") and item.get("answer"):
+            lines.extend([f"### {literal(item['question'])}", "", literal(item["answer"]), ""])
+    insights = records(digest.get("insights")) or [
+        {"title": item.get("claim"), "summary": item.get("speaker")}
+        for item in records(evidence.get("claims")) if item.get("claim")
+    ]
+    for item in insights:
+        if item.get("title") or item.get("summary"):
+            lines.extend([f"### {literal(item.get('title') or labels['claim'])}", "", literal(item.get("summary")), ""])
+            lines.extend(f"- {literal(value)}" for value in strings(item.get("bullets")))
+            lines.append("")
+    for item in records(evidence.get("quotes"))[:3]:
+        if item.get("text"):
+            lines.extend([f"> {literal(item['text'])}", "", literal(item.get("speaker")), ""])
+    for item in records(evidence.get("actions")):
+        if item.get("action"):
+            lines.extend([f"- {literal(item['action'])}", ""])
+    for key, values in (("open_questions", digest.get("open_questions")), ("limitations", evidence.get("limitations"))):
+        if strings(values):
+            lines.extend([f"## {labels[key]}", ""])
+            lines.extend(f"- {literal(value)}" for value in strings(values))
+            lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
-def render(episode_dir: Path, output: Path, *, include_transcript: bool = True) -> dict[str, Any]:
+def reading_minutes(content: str) -> int:
+    """Estimate only visible summary text, treating CJK glyphs as characters."""
+    text = html.unescape(re.sub(r"<[^>]*>", " ", content))
+    cjk = len(re.findall(r"[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]", text))
+    words = len(re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9]+(?:['’-][A-Za-zÀ-ÖØ-öø-ÿ]+)*", text))
+    return max(1, math.ceil(cjk / 400 + words / 200))
+
+
+
+def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
+           finalized: bool | None = None) -> dict[str, Any]:
     episode_dir = episode_dir.expanduser().resolve()
     transcript = load(episode_dir / "transcript.json")
     bundle = load(episode_dir / "bundle.json")
@@ -184,9 +233,10 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True) 
     segments = records(transcript.get("segments"))
     segment_map = {str(item.get("segment_id", index)): item for index, item in enumerate(segments, 1)}
     timestamp_link_count = 0
+    reference_count = 0
 
-    def references(items: Any, *, mark_missing: bool = False) -> str:
-        nonlocal timestamp_link_count
+    def references(items: Any, *, mark_missing: bool = False, compact: bool = False) -> str:
+        nonlocal timestamp_link_count, reference_count
         links = []
         seen = set()
         for item in records(items):
@@ -214,24 +264,34 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True) 
             if start is not None and end is not None and end > start:
                 label += "–" + stamp(end)
             link = timestamp_url(source_url, start) if start is not None else None
+            reference_key = (label, link, anchor_id)
+            if reference_key in seen:
+                continue
+            seen.add(reference_key)
+            reference_count += 1
+            reference_id = f"reference-{reference_count}"
+            time_html = f'<span class="reference-time">{esc(label)}</span>'
+            compact_html = f'<span class="compact-reference">{esc(labels["reference"])} {len(links) + 1} ↗</span>' if compact else ""
             if link:
-                entry = f'<a href="{esc(link)}" target="_blank" rel="noopener noreferrer" aria-label="{esc(labels["evidence"] + ": " + label)}">{esc(label)} ↗</a>'
+                description = labels["view_episode"] + ": " + label
+                entry = f'<a id="{reference_id}" href="{esc(link)}" target="_blank" rel="noopener noreferrer" title="{esc(description)}" aria-label="{esc(description)}">{time_html}<span class="evidence-action">{esc(labels["view_episode"])} ↗</span>{compact_html}</a>'
                 timestamp_link_count += 1
             elif ids and include_transcript:
-                entry = f'<a class="segment-reference" href="#segment-{esc(anchor_id)}">{esc(label)}</a>'
+                description = labels["view_text"] + ": " + label
+                entry = f'<a id="{reference_id}" class="segment-reference" href="#segment-{esc(anchor_id)}" title="{esc(description)}" aria-label="{esc(description)}">{time_html}<span class="evidence-action">{esc(labels["view_text"])} ↗</span>{compact_html}</a>'
             else:
-                entry = f'<span>{esc(label)}</span>'
-            if entry not in seen:
-                links.append(entry)
-                seen.add(entry)
+                plain_compact = f'<span class="compact-reference">{esc(labels["reference"])} {len(links) + 1}</span>' if compact else ""
+                entry = f'<span title="{esc(label)}" aria-label="{esc(label)}">{time_html}{plain_compact}</span>'
+            links.append(entry)
         if not links and mark_missing:
             links.append(f'<span>{esc(labels["evidence_missing"])}</span>')
-        return f'<div class="evidence">{"".join(links)}</div>' if links else ""
+        return f'<div class="evidence{" compact-evidence" if compact else ""}">{"".join(links)}</div>' if links else ""
 
-    def section(key: str, content: str, class_name: str = "") -> str:
+    def section(key: str, content: str, class_name: str = "", count: int = 0) -> str:
         if not content:
             return ""
-        return f'<section class="{esc(class_name)}" aria-labelledby="{key}-title"><h2 id="{key}-title">{esc(labels[key])}</h2>{content}</section>'
+        counter = f'<span class="section-count" aria-hidden="true">{count:02d}</span>' if count else ""
+        return f'<section id="{key}" class="{esc(class_name)}" aria-labelledby="{key}-title"><div class="section-heading"><h2 id="{key}-title">{esc(labels[key])}</h2>{counter}</div>{content}</section>'
 
     participants = []
     for item in records(digest.get("participants")):
@@ -247,7 +307,7 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True) 
     for item in records(digest.get("quick_takes")):
         if not item.get("question") or not item.get("answer"):
             continue
-        quick_rows.append(f'<article class="card quick-card"><div class="question">{esc(item["question"])}</div><div class="answer">{esc(item["answer"])}</div>{references(item.get("evidence"), mark_missing=True)}</article>')
+        quick_rows.append(f'<article class="card quick-card"><h3 class="question">{esc(item["question"])}</h3><p class="answer">{esc(item["answer"])}</p>{references(item.get("evidence"), mark_missing=True)}</article>')
 
     insights = records(digest.get("insights"))
     if not insights:
@@ -298,8 +358,10 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True) 
         stamp_html = f'<a href="{esc(link)}" target="_blank" rel="noopener noreferrer">{esc(label)} ↗</a>' if link else esc(label)
         speaker = f'<strong class="speaker">{esc(item["speaker"])}</strong>' if item.get("speaker") else ""
         search = esc(f'{item.get("speaker") or ""} {item.get("text") or ""}'.lower())
-        transcript_rows.append(f'<article id="segment-{esc(segment_id)}" class="segment" data-search="{search}"><div class="stamp">{stamp_html}</div><div>{speaker}<p>{esc(item.get("text"))}</p></div></article>')
+        transcript_rows.append(f'<article id="segment-{esc(segment_id)}" class="segment" tabindex="-1" data-search="{search}"><div class="stamp">{stamp_html}</div><div>{speaker}<p>{esc(item.get("text"))}</p></div></article>')
 
+    has_summary = bool(digest.get("takeaway") or evidence.get("summary") or quick_rows or insight_rows)
+    pending = has_summary and finalized is not True and bool(bundle.get("status")) and bundle.get("status") != "analyzed"
     metadata = []
     if episode.get("show"):
         metadata.append(f'<span>{esc(episode["show"])}</span>')
@@ -308,38 +370,73 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True) 
     duration = seconds_value(episode.get("duration_seconds"))
     if duration is None:
         duration = seconds_value(transcript.get("duration_seconds"))
-    if duration:
-        metadata.append(f'<span>{math.ceil(duration / 60)} {esc(labels["minutes"])}</span>')
-    if source_url:
-        metadata.append(f'<a href="{esc(source_url)}" target="_blank" rel="noopener noreferrer">{esc(labels["source"])} ↗</a>')
+    names = [str(item["name"]) for item in records(digest.get("participants")) if item.get("name")]
+    if names:
+        metadata.append(f'<span>{esc(" · ".join(names))}</span>')
     subtitle = f'<p class="episode-title">{esc(original_title)}</p>' if title != original_title else ""
     limitation_items = "".join(f"<li>{esc(value)}</li>" for value in strings(evidence.get("limitations")))
     limitations = section("limitations", f"<ul>{limitation_items}</ul>", "limitations") if limitation_items else ""
     open_items = "".join(f"<li>{esc(value)}</li>" for value in strings(digest.get("open_questions")))
     open_questions = section("open_questions", f'<div class="card open-questions"><ul>{open_items}</ul></div>') if open_items else ""
     chapter_content = section("chapters", f'<ol class="chapters">{"".join(chapter_rows)}</ol>') if chapter_rows else ""
-    transcript_content = section("transcript", f'<label for="search">{esc(labels["search"])}</label><input id="search" type="search" placeholder="{esc(labels["placeholder"])}" autocomplete="off"><div id="result-count" role="status" aria-live="polite"></div><div id="segments">{"".join(transcript_rows)}</div>') if transcript_rows else ""
+    search_content = f'''<label for="search">{esc(labels["search"])}</label>
+<div class="search-controls"><input id="search" type="search" placeholder="{esc(labels["placeholder"])}" autocomplete="off" aria-controls="segments"><button id="clear-search" class="button" type="button" disabled>{esc(labels["clear"])}</button></div>
+<div id="result-count" role="status" aria-live="polite" data-all="{esc(labels["count_all"])}" data-match="{esc(labels["count_match"])}"></div>
+<div id="search-empty" class="search-empty" hidden><strong>{esc(labels["empty_title"])}</strong><p>{esc(labels["empty_help"])}</p><button id="reset-search" class="button" type="button">{esc(labels["reset"])}</button></div>
+<div id="segments">{"".join(transcript_rows)}</div>'''
+    transcript_content = section("transcript", search_content) if transcript_rows else ""
     details_label = labels["details"] if transcript_rows else labels["details_chapters"]
-    details = f'<details class="source-details" id="source-details"><summary>{esc(details_label)}</summary><div class="source-content">{chapter_content}{transcript_content}</div></details>' if chapter_content or transcript_content else ""
-    # JSON strings below are labels from the fixed dictionary, never user-authored data.
-    all_label, match_label = json.dumps(labels["count_all"], ensure_ascii=False), json.dumps(labels["count_match"], ensure_ascii=False)
-    script = """const input=document.querySelector('#search'),rows=[...document.querySelectorAll('.segment')],count=document.querySelector('#result-count');
-function filter(){const q=input.value.trim().toLowerCase();let visible=0;for(const row of rows){const show=!q||row.dataset.search.includes(q);row.hidden=!show;if(show)visible++}count.textContent=(q?MATCH_LABEL:ALL_LABEL).replace('{n}',q?visible:rows.length)}
-if(input){input.addEventListener('input',filter);filter()}
-function revealSource(){if(!location.hash.startsWith('#segment-'))return;const target=document.getElementById(location.hash.slice(1)),details=document.getElementById('source-details');if(target&&details){details.open=true;if(input){input.value='';filter()}target.scrollIntoView({block:'center'})}}
-window.addEventListener('hashchange',revealSource);document.querySelectorAll('.segment-reference').forEach(link=>link.addEventListener('click',()=>{const details=document.getElementById('source-details');if(details)details.open=true;if(input){input.value='';filter()}}));revealSource();""".replace("MATCH_LABEL", match_label).replace("ALL_LABEL", all_label)
-    script_tag = f"<script>{script}</script>" if transcript_rows else ""
+    return_control = f'<div class="source-return"><a class="return-summary" href="#summary">← {esc(labels["return"])}</a></div>' if transcript_rows else ""
+    details = f'<details class="source-details" id="source-details"><summary>{esc(details_label)}</summary><div class="source-content">{return_control}{chapter_content}{transcript_content}{return_control}</div></details>' if chapter_content or transcript_content else ""
+    summary_content = "".join((
+        section("quick", f'<div class="grid">{"".join(quick_rows)}</div>', count=len(quick_rows)) if quick_rows else "",
+        section("insights", "".join(insight_rows), count=len(insight_rows)),
+        section("quotes", "".join(quote_rows)), section("actions", "".join(action_rows)), open_questions,
+        section("participants", f'<div class="grid">{"".join(participants)}</div>') if participants else "", limitations,
+    ))
+    takeaway_html = f'<div class="takeaway"><span class="kicker">{esc(labels["takeaway"] if has_summary else labels["pending_title"])}</span><p>{esc(takeaway)}</p>{references(digest.get("evidence") or digest.get("takeaway_evidence"), compact=True)}</div>'
+    stats = []
+    if has_summary:
+        minutes = reading_minutes(takeaway_html + summary_content)
+        stats.append(f'<span class="read-time" title="{esc(labels["reading_basis"])}">{esc(labels["reading"].format(n=minutes))}</span>')
+    if duration:
+        stats.append(f'<span>{esc(labels["duration"].format(n=math.ceil(duration / 60)))}</span>')
+    if quick_rows:
+        stats.append(f'<span>{esc(labels["questions_count"].format(n=len(quick_rows)))}</span>')
+    if insight_rows:
+        stats.append(f'<span>{esc(labels["insights_count"].format(n=len(insight_rows)))}</span>')
+    reading_stats = f'<div class="reading-stats">{"".join(stats)}</div>' if stats else ""
+    toolbar_buttons = []
+    payload = fallback = ""
+    if has_summary and not pending:
+        markdown = markdown_summary(evidence, bundle, transcript, title, takeaway, labels)
+        filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", title).strip(". ")[:100] or "podcast-summary"
+        toolbar_buttons.extend((
+            f'<button id="copy-summary" class="button primary" type="button" data-success="{esc(labels["copied"])}" data-manual="{esc(labels["copy_manual"])}">{esc(labels["copy"])}</button>',
+            f'<button id="download-summary" class="button" type="button" data-filename="{esc(filename)}.md" data-success="{esc(labels["saved"])}" data-failure="{esc(labels["save_failed"])}">{esc(labels["save"])}</button>',
+        ))
+        payload = f'<pre id="summary-markdown" hidden>{esc(markdown)}</pre>'
+        fallback = f'<div id="copy-fallback" class="copy-fallback" hidden><p>{esc(labels["copy_help"])}</p><label class="sr-only" for="copy-text">{esc(labels["copy_text"])}</label><textarea id="copy-text" readonly spellcheck="false"></textarea><button id="close-copy" class="button" type="button">{esc(labels["copy_close"])}</button></div>'
+    if source_url:
+        toolbar_buttons.append(f'<a class="button source-button" href="{esc(source_url)}" target="_blank" rel="noopener noreferrer">{esc(labels["source"])} ↗</a>')
+    toolbar = f'<div class="toolbar">{"".join(toolbar_buttons)}</div>' if toolbar_buttons else ""
+    feedback = f'<p id="toolbar-status" class="toolbar-feedback" role="status" aria-live="polite">{esc(labels["stale"]) if pending else ""}</p>' if toolbar_buttons or pending else ""
+    nav_items = []
+    for key, available in (("quick", quick_rows), ("insights", insight_rows), ("quotes", quote_rows), ("open_questions", open_items), ("source", details)):
+        if available:
+            target = "source-details" if key == "source" else key
+            nav_items.append(f'<li><a href="#{target}">{esc(labels["nav_" + key])}</a></li>')
+    nav = f'<nav class="section-nav" aria-label="{esc(labels["nav"])}"><ul>{"".join(nav_items)}</ul></nav>' if nav_items else ""
+    script_tag = f"<script>{TOOLBAR_SCRIPT}{TRANSCRIPT_SCRIPT if transcript_rows else ''}</script>"
     page = f"""<!doctype html>
 <html lang="{labels["language"]}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:,">
 <meta name="description" content="{esc(takeaway)}"><title>{esc(title)} · Podcast Reader</title><style>{STYLE}</style></head>
-<body><a class="skip" href="#summary">{esc(labels["skip"])}</a><div class="page">
+<body id="top"><a class="skip" href="#summary">{esc(labels["skip"])}</a><div class="page">
 <header class="hero"><div class="eyebrow">{esc(labels["brand"])}</div><h1>{esc(title)}</h1>{subtitle}<div class="metadata">{"".join(metadata)}</div>
-<div class="takeaway"><span class="kicker">{esc(labels["takeaway"])}</span><p>{esc(takeaway)}</p>{references(digest.get("evidence") or digest.get("takeaway_evidence"))}</div></header>
-<main id="summary">{section("participants", f'<div class="grid">{"".join(participants)}</div>') if participants else ""}
-{section("quick", f'<div class="grid">{"".join(quick_rows)}</div>') if quick_rows else ""}
-{section("insights", "".join(insight_rows))}{section("quotes", "".join(quote_rows))}{section("actions", "".join(action_rows))}{open_questions}{limitations}{details}</main>
-<footer>{esc(labels["footer"])}</footer></div>{script_tag}</body></html>"""
+{takeaway_html}{reading_stats}{toolbar}{feedback}{fallback}</header>{nav}
+<main id="summary" tabindex="-1">{summary_content}{details}</main>
+<footer><span>{esc(labels["footer"])}</span><a href="#top">{esc(labels["top"])} ↑</a></footer></div>{payload}{script_tag}</body></html>"""
     output = output.expanduser().resolve()
     atomic_write_text(output, page)
     return {

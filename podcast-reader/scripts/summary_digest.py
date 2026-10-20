@@ -357,17 +357,8 @@ def render_markdown(evidence: dict[str, Any], bundle: dict[str, Any],
     if not metadata:
         metadata.append(label("转写材料", "Transcript"))
     lines = [f"# {_escape(digest['headline'])}", ""]
-    if metadata:
-        lines.extend([label("来源：", "Source: ") + " · ".join(metadata), ""])
     lines.extend([label("## 一句话总结", "## One-sentence takeaway"), "", _escape(digest["takeaway"]), "",
                   _citations(digest["evidence"], segments, english), ""])
-    participants = digest.get("participants") or []
-    if participants:
-        lines.extend([label("## 对谈双方" if len(participants) == 2 else "## 本期人物", "## Participants"), ""])
-        for person in participants:
-            detail = " · ".join(_escape(person.get(field)) for field in ("role", "description") if person.get(field))
-            lines.append(f"- **{_escape(person['name'])}**" + (label("：", ": ") + detail if detail else ""))
-        lines.append("")
     lines.extend([label("## 关键问题 · 直接看答案", "## Key questions · Direct answers"), ""])
     for item in digest["quick_takes"]:
         lines.extend([f"### {_escape(item['question'])}", "", _escape(item["answer"]), "",
@@ -395,19 +386,28 @@ def render_markdown(evidence: dict[str, Any], bundle: dict[str, Any],
                 if item.get(field):
                     lines.append(f"  {field_label}" + label("；", "; ").join(_escape(value) for value in item[field]))
         lines.append("")
+    if digest.get("open_questions"):
+        lines.extend([label("## 仍未解决的问题", "## Open questions"), ""])
+        lines.extend(f"- {_escape(item)}" for item in digest["open_questions"])
+        lines.append("")
+    participants = digest.get("participants") or []
+    if participants:
+        lines.extend([label("## 对谈双方" if len(participants) == 2 else "## 本期人物", "## Participants"), ""])
+        for person in participants:
+            detail = " · ".join(_escape(person.get(field)) for field in ("role", "description") if person.get(field))
+            lines.append(f"- **{_escape(person['name'])}**" + (label("：", ": ") + detail if detail else ""))
+        lines.append("")
+    if metadata:
+        lines.extend([label("来源：", "Source: ") + " · ".join(metadata), ""])
+    if evidence.get("limitations"):
+        lines.extend([label("## 说明与限制", "## Notes and limitations"), ""])
+        lines.extend(f"- {_escape(item)}" for item in evidence["limitations"])
+        lines.append("")
     if evidence.get("chapters"):
         lines.extend([label("## 回听章节", "## Listening chapters"), ""])
         for item in evidence["chapters"]:
             detail = label("：", ": ") + _escape(item["summary"]) if item.get("summary") else ""
             lines.append(f"- {_citation(item, segments, english)} **{_escape(item['title'])}**{detail}")
-        lines.append("")
-    if digest.get("open_questions"):
-        lines.extend([label("## 仍未解决的问题", "## Open questions"), ""])
-        lines.extend(f"- {_escape(item)}" for item in digest["open_questions"])
-        lines.append("")
-    if evidence.get("limitations"):
-        lines.extend([label("## 说明与限制", "## Notes and limitations"), ""])
-        lines.extend(f"- {_escape(item)}" for item in evidence["limitations"])
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

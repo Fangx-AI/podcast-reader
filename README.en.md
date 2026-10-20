@@ -31,17 +31,19 @@ No mode selection or setup interview is needed. You can also provide audio, vide
 
 ## What you get
 
-![Dark and gold podcast summary preview](docs/assets/summary-preview.png)
+![Dark and gold podcast summary preview](docs/assets/summary-preview.jpg)
 
 [Open the complete HTML example](docs/examples/summary-preview.html). The preview uses an original fictional episode to demonstrate the layout; it is not a summary of a real interview.
+
+[Read the UX review and before/after comparisons (Chinese)](docs/reader-ux-review.md).
 
 | Section | Purpose |
 |---|---|
 | **Headline and one-sentence takeaway** | Understand the main question and conclusion immediately |
-| **Participants** | Identify who is speaking using source-confirmed information |
 | **Key questions · direct answers** | Usually 3–6 important listener questions with concise answers and references |
 | **High-value insights** | Usually 3–7 ideas, explained with reasoning, examples, and limits |
 | **Unanswered questions** | Identify questions the episode actually leaves unresolved, when relevant |
+| **Participants** | Identify who is speaking using source-confirmed information |
 | **References and limitations** | Check original passages and see missing content or unchecked claims |
 
 Prioritize counterintuitive ideas, decision-changing conclusions, useful data and cases, concrete methods, pitfalls, boundaries, and genuine disagreement. Include only what the episode supports; do not fill categories for their own sake.
@@ -52,6 +54,8 @@ The two main deliverables are:
 
 - **`summary.md`** — a concise summary to save, copy, or share.
 - **`reader.html`** — a responsive dark and gold card layout, with the summary first and source text available when needed.
+
+Read the takeaway, key answers, and insights first; participant and source details follow. The reader offers copy and Markdown save controls, with a manual copy fallback when the browser blocks clipboard access. A sticky section menu helps navigation, source references let you return to your previous summary position, and cards use one column on mobile. Links to an episode's exact time depend on its platform and available timestamps.
 
 Real timestamps are preserved. Untimed TXT and Markdown sources use segment references instead of invented times.
 

@@ -104,7 +104,7 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
         checks["summary_written"] = True
 
     try:
-        reader_result = render_reader(episode_dir, episode_dir / "reader.html")
+        reader_result = render_reader(episode_dir, episode_dir / "reader.html", finalized=True)
         checks["reader_rendered"] = reader_result.get("status") == "rendered"
     except Exception as exc:
         checks["reader_rendered"] = False

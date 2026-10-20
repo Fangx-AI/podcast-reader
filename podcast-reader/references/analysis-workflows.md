@@ -2,6 +2,10 @@
 
 The default task is a concise, evidence-backed podcast summary that takes approximately 3–5 minutes to read. The core editorial job is to **identify key questions and high-value information**, not to shorten every section equally.
 
+Design two reading depths. In the first 30 seconds, the title, takeaway, and first sentences of the key answers should communicate the central issue, answer, and major boundary. The insights then reward a closer read with mechanisms, examples, methods, or exceptions that were not already explained.
+
+For a substantial episode, target approximately **900–1,600 Chinese characters or 500–900 English words** across the visible summary. These are editorial ranges, not minimums, schema limits, or a reason to pad a short episode. The renderer estimates reading time from the finished text; the target does not justify displaying a fixed reading time.
+
 ## 1. Establish coverage
 
 Read source metadata, the transcript quality report, and the full chunk inventory. Inspect the transcript in bounded batches across every substantive part of the episode. Track its central question, major turns, conclusions, disagreements, and exceptions.
@@ -25,16 +29,20 @@ These are editorial prompts, not required categories. Write questions specific t
 
 Each `quick_takes` item needs:
 
-1. A clear question.
-2. A direct answer in its first sentence.
-3. Enough reasoning, an example, or a caveat to make the answer useful.
+1. A short, concrete question with one main point.
+2. A direct answer in its first sentence, understandable without reading the rest of the page.
+3. Only the essential reason or caveat; reserve detailed calculations and procedures for insights.
 4. Source references covering all material parts of the answer.
 
 Usually select 3–6 questions. Short sources may support only one or two.
 
+For Chinese, a question often fits in 6–16 characters and its answer in 30–60. Use these as editing cues, not enforced limits. Preserve a decisive condition even when it needs extra words. Rank questions by importance to the reader, not by their original timestamp. The reader should not need to read six long paragraphs before finding the central answer.
+
 ## 3. Rank the information worth keeping
 
 Select 3–7 high-value insights when the source supports them. Use fewer when it does not. Prefer items with clear relevance, specificity, evidence, and explanatory value.
+
+Start with a candidate list, then order it by: effect on understanding or decisions, distinctiveness, specificity, and strength of episode evidence. Remove low-value items before polishing prose. Do not make every source section equally prominent merely to demonstrate coverage.
 
 | Optional kind | What earns a place | Preserve |
 |---|---|---|
@@ -47,12 +55,14 @@ Select 3–7 high-value insights when the source supports them. Use fewer when i
 
 Kinds are optional labels, not six mandatory boxes. If a speaker supplies no numbers or methods, do not invent them. An anecdote can be memorable without proving a general claim. Explain why an insight matters through its substance rather than adding a generic “this is important” sentence.
 
-Remove repetition across quick answers and insights. An insight can deepen a short answer with its mechanism, example, or limit; it should not repeat it verbatim.
+Remove repetition across quick answers and insights. A quick answer says what the reader needs to know; an insight must add a mechanism, an illustrative calculation, concrete steps, an exception, or disagreement. It should not repeat the answer with more words.
+
+For example, if an answer says “Count verification and revision time, not just generation time,” the insight should show a source-supported calculation or a comparison method. A second paragraph saying “The whole process matters” adds no information. If the episode supplies no deeper detail, omit that insight.
 
 ## 4. Preserve meaning while compressing
 
 - Put the central question and takeaway at the top.
-- Retain the strongest qualifying condition, meaningful disagreement, or exception.
+- Retain the strongest qualifying condition, meaningful disagreement, or exception next to the claim it changes. A footer disclaimer cannot repair an overstated answer.
 - Attribute opinions, predictions, and recommendations to the speaker. Label a cross-passage inference as a synthesis.
 - Keep names, figures, dates, and units exact when confirmed; otherwise omit or qualify them.
 - Introduce participants only when source metadata or introductions establish their identity. Do not guess credentials or biographies.
@@ -63,6 +73,8 @@ Remove repetition across quick answers and insights. An insight can deepen a sho
 
 A 3–5 minute reading target is an editorial target, not a guarantee based on runtime or word count. Do not fill available space just because the validator allows it.
 
+Review optional sections by purpose: a participant card helps interpret who is speaking; a quotation preserves wording that matters; an action enables a useful next step; an open question preserves an actual unresolved issue. If a section only duplicates an answer or insight, omit it.
+
 ## 5. Evidence and completion
 
 Write `evidence.json` using the [output contract](output-schema.md). Reference source segments for the takeaway, each quick answer, and each insight. Cite all distant passages used in a synthesis. Time ranges must come from the actual transcript; untimed sources use segment IDs without fabricated times.
@@ -72,8 +84,10 @@ Run `finalize_bundle.py`, then `validate_bundle.py`. In `summary` mode, finaliza
 Check the result as a reader:
 
 - Can I identify the episode's central question within a few seconds?
+- After 30 seconds with the takeaway and direct answer sentences, do I have a useful understanding even if I stop reading?
 - Do the questions express real stakes and give direct answers?
-- Does each insight contain something specific worth retaining?
+- Does each insight add something specific beyond what the answers already told me?
+- Is the most consequential information first, and can low-value content be removed?
 - Are reasoning, boundaries, and disagreements preserved where they change meaning?
 - Does the result cover the episode rather than just an opening segment or search result?
 - Can each main point be checked against its source?

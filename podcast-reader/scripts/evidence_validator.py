@@ -168,11 +168,21 @@ def validate_evidence(document: Any, transcript: dict[str, Any]) -> dict[str, An
                 errors.append(f"{label}: invalid type")
             _validate_evidence_list(item, segments, duration, label, errors, required=evidence_required)
 
-    if not document.get("claims"):
+    if "digest" in document:
+        from summary_digest import validate_digest
+        digest_result = validate_digest(document, transcript)
+        errors.extend(digest_result["errors"])
+        warnings.extend(digest_result.get("warnings", []))
+
+    if not document.get("claims") and not document.get("digest"):
         warnings.append("evidence contains no claims")
     coverage_ids: set[int] = set()
-    for collection in ("claims", "actions", "entities"):
-        for item in document.get(collection, []) if isinstance(document.get(collection), list) else []:
+    citation_collections = [document.get(name, []) for name in ("claims", "actions", "entities")]
+    digest = document.get("digest")
+    if isinstance(digest, dict):
+        citation_collections.extend([[digest], digest.get("quick_takes", []), digest.get("insights", [])])
+    for collection in citation_collections:
+        for item in collection if isinstance(collection, list) else []:
             if isinstance(item, dict):
                 for reference in item.get("evidence", []) if isinstance(item.get("evidence"), list) else []:
                     if isinstance(reference, dict):

@@ -1,7 +1,7 @@
 interface:
   display_name: "Podcast Reader"
-  short_description: "Understand podcasts fast, ask questions, find exact moments"
+  short_description: "Key questions and high-value podcast insights in minutes"
   icon_small: "./assets/icon-small.svg"
   icon_large: "./assets/icon-large.svg"
-  brand_color: "#6D5EF7"
-  default_prompt: "Use $podcast-reader on this link or file. Help me understand the episode quickly, answer my questions from the content, and cite timestamps so I can return to the original moment. Reuse an existing episode bundle when available."
+  brand_color: "#D6B75B"
+  default_prompt: "Use $podcast-reader to turn this podcast link or file into a concise 3–5 minute summary in my language. Review the whole episode, identify its key questions and direct answers, and select high-value insights with source references. Deliver summary.md and a card-style reader.html. Use summary mode by default and reuse matching source artifacts when available."

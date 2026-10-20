@@ -17,6 +17,7 @@ import urllib.parse
 import zipfile
 
 from runtime_utils import atomic_write_json, atomic_write_text, sha256_file, skill_version
+from render_reader import render as render_reader
 
 
 SENSITIVE_QUERY = re.compile(r"(?:token|sig(?:nature)?|auth|secret|session|jwt|key|policy|expires?|credential|hdnea)", re.I)
@@ -103,7 +104,12 @@ def export(episode_dir: Path, output: Path, profile: str, include_full_transcrip
             relative = source.relative_to(episode_dir)
             target = staging / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            if source.suffix.lower() == ".json":
+            if source.name == "reader.html" and not include_full_transcript:
+                # A collapsed transcript is still the complete text in the HTML.
+                # Render the summary alone for the default share export.
+                render_reader(episode_dir, target, include_transcript=False)
+                atomic_write_text(target, sanitize_text(target.read_text(encoding="utf-8"), episode_dir))
+            elif source.suffix.lower() == ".json":
                 try:
                     value = json.loads(source.read_text(encoding="utf-8-sig"))
                     atomic_write_json(target, sanitize_value(value, episode_dir))

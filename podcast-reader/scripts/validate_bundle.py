@@ -10,6 +10,8 @@ from pathlib import Path
 
 from evidence_validator import validate_evidence
 from validate_notes import validate as validate_notes
+from summary_digest import render_markdown, validate_digest
+from runtime_utils import sha256_file
 
 
 READY_STATUSES = {"ready", "ready_for_analysis", "analyzed"}
@@ -78,11 +80,23 @@ def validate(episode_dir: Path) -> dict:
             warnings.append("chunk index segment_count differs from transcript")
 
     if bundle.get("status") == "analyzed":
-        for name in ("analysis.md", "evidence.json", "reader.html"):
+        summary_mode = bundle.get("analysis_mode") == "summary"
+        required_files = ["analysis.md", "evidence.json", "reader.html"]
+        if summary_mode:
+            required_files.append("summary.md")
+        for name in required_files:
             checks[f"analyzed_{name}_exists"] = (episode_dir / name).is_file()
             if not checks[f"analyzed_{name}_exists"]:
                 errors.append(f"analyzed bundle is missing {name}")
-        if isinstance(transcript, dict) and (episode_dir / "analysis.md").is_file():
+        if summary_mode:
+            hashes = bundle.get("deliverable_hashes")
+            hashes = hashes if isinstance(hashes, dict) else {}
+            for name in ("summary.md", "reader.html"):
+                path = episode_dir / name
+                checks[f"{name}_integrity"] = path.is_file() and hashes.get(name) == sha256_file(path)
+                if not checks[f"{name}_integrity"]:
+                    errors.append(f"{name} is missing a matching completion hash; run finalize_bundle.py")
+        if not summary_mode and isinstance(transcript, dict) and (episode_dir / "analysis.md").is_file():
             report_result = validate_notes(episode_dir / "analysis.md", strict=True, transcript_path=transcript_path)
             checks["analysis_grounded"] = report_result["valid"]
             errors.extend(f"analysis: {item}" for item in report_result["failures"])
@@ -91,6 +105,17 @@ def validate(episode_dir: Path) -> dict:
             evidence_result = validate_evidence(evidence, transcript)
             checks["evidence_grounded"] = evidence_result["valid"]
             errors.extend(f"evidence: {item}" for item in evidence_result["errors"])
+            if summary_mode:
+                digest_result = validate_digest(evidence, transcript, required=True)
+                checks["summary_grounded"] = digest_result["valid"]
+                errors.extend(f"summary: {item}" for item in digest_result["errors"])
+                if evidence_result["valid"] and digest_result["valid"]:
+                    expected = render_markdown(evidence, bundle, transcript)
+                    for name in ("summary.md", "analysis.md"):
+                        path = episode_dir / name
+                        checks[f"{name}_current"] = path.is_file() and path.read_text(encoding="utf-8-sig") == expected
+                        if not checks[f"{name}_current"]:
+                            errors.append(f"{name} differs from validated digest; run finalize_bundle.py")
 
     chunk_manifest_path = episode_dir / "audio-chunks" / "audio-chunks.json"
     if chunk_manifest_path.is_file():

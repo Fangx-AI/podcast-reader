@@ -1,85 +1,86 @@
-# Analysis workflows
+# Summary workflow
 
-Select only the modules needed for the user's intent. All episode-specific conclusions remain traceable to transcript or visual timestamps.
+The default task is a concise, evidence-backed podcast summary that takes approximately 3–5 minutes to read. The core editorial job is to **identify key questions and high-value information**, not to shorten every section equally.
 
-## Quality model
+## 1. Establish coverage
 
-Every high-quality report answers four questions:
+Read source metadata, the transcript quality report, and the full chunk inventory. Inspect the transcript in bounded batches across every substantive part of the episode. Track its central question, major turns, conclusions, disagreements, and exceptions.
 
-1. **What happened?** Accurate chaptered account.
-2. **What is the reasoning?** Thesis, evidence, assumptions, objections, conclusions.
-3. **How trustworthy is it?** Source quality, transcript confidence, missing evidence, contradictions.
-4. **What can the user do with it?** Decisions, actions, study materials, or further research.
+A keyword search is useful for verification after broad reading; a few top-ranked hits are not sufficient evidence for a whole-episode summary. Check neighboring chunks when a speaker qualifies a point or responds to someone else. Do not erase a later correction because an earlier statement is easier to summarize.
 
-## Full decomposition
+If the source is partial, summarize only the available content and explicitly state the scope. Metadata-only preparation cannot produce an episode summary.
 
-1. State the episode's central question and its most defensible answer.
-2. Segment by semantic topic shifts, not equal time slices.
-3. For each segment identify speaker, claim, evidence/example, assumption, counterpoint, and transition.
-4. Connect segments into an argument map without erasing disagreements.
-5. Separate episode statements from analyst synthesis and external verification.
-6. End with implications, action conditions, risks, unresolved questions, and confidence limits.
+## 2. Find the questions a listener cares about
 
-## Argument map
+A key question should make the reader want its answer because it clarifies the episode's stakes. Typical forms include:
 
-Represent the reasoning as:
+- What decision is being discussed, and what changes the answer?
+- Why does the speaker think a common assumption is wrong?
+- How does the proposed method actually work?
+- What evidence or example changes the conclusion?
+- Where does the advice stop applying, or where do speakers disagree?
+- For narrative material: what happened, why did it happen, and what changed?
 
-`central question → thesis → supporting premises → examples/data → assumptions → objections → responses → conclusion`
+These are editorial prompts, not required categories. Write questions specific to the episode. Avoid generic prompts such as “What is the topic?” or “What did the guest say?” when a concrete question is available.
 
-An anecdote may illustrate a premise but does not automatically prove it. Absence of an objection in the episode does not mean no objection exists.
+Each `quick_takes` item needs:
 
-## Claim ledger
+1. A clear question.
+2. A direct answer in its first sentence.
+3. Enough reasoning, an example, or a caveat to make the answer useful.
+4. Source references covering all material parts of the answer.
 
-| Field | Allowed values / meaning |
-|---|---|
-| Claim | Concise normalized proposition |
-| Speaker | Name or unknown label |
-| Kind | fact, opinion, anecdote, prediction, recommendation, synthesis |
-| Evidence | One or more timestamp ranges |
-| Support | stated, illustrated, argued, asserted, contradicted |
-| Confidence | high, medium, low |
-| Verification | not_checked, supported, mixed, contradicted, not_verifiable |
+Usually select 3–6 questions. Short sources may support only one or two.
 
-Do not fact-check every claim automatically. Prioritize current, consequential, surprising, quantitative, or high-stakes claims.
+## 3. Rank the information worth keeping
 
-## Speaker and disagreement analysis
+Select 3–7 high-value insights when the source supports them. Use fewer when it does not. Prefer items with clear relevance, specificity, evidence, and explanatory value.
 
-Track positions over time. Report a change of mind only when later language meaningfully revises an earlier position. Distinguish substantive disagreement, different definitions, different time horizons, and complementary perspectives. Do not infer personality or motive from tone unless the user explicitly requests rhetorical analysis and the evidence supports it.
+| Optional kind | What earns a place | Preserve |
+|---|---|---|
+| `decision` | A conclusion that could change an assessment or decision | Who it applies to, conditions, tradeoffs |
+| `counterintuitive` | A credible challenge to a common assumption | What changed and the speaker's reasoning |
+| `data` | A revealing number, experiment, or concrete case | Context, units, scope, and whether it is anecdotal |
+| `method` | A usable process or mechanism | Actual steps, prerequisites, limits |
+| `pitfall` | An important failure mode, risk, or boundary | Why it fails and when the warning matters |
+| `insight` | Another central idea, narrative development, or meaningful disagreement | Explanation and source context |
 
-## Topic research within an episode
+Kinds are optional labels, not six mandatory boxes. If a speaker supplies no numbers or methods, do not invent them. An anecdote can be memorable without proving a general claim. Explain why an insight matters through its substance rather than adding a generic “this is important” sentence.
 
-1. Search exact topic, aliases, related entities, and translated terms.
-2. Retrieve adjacent chunks around each hit.
-3. Group findings by subtopic and chronology.
-4. Include negative evidence and challenges, not only repeated supportive mentions.
-5. State whether the topic is central, recurring, incidental, or absent.
+Remove repetition across quick answers and insights. An insight can deepen a short answer with its mechanism, example, or limit; it should not repeat it verbatim.
 
-## Cross-episode comparison
+## 4. Preserve meaning while compressing
 
-Build one bundle per episode, then align:
+- Put the central question and takeaway at the top.
+- Retain the strongest qualifying condition, meaningful disagreement, or exception.
+- Attribute opinions, predictions, and recommendations to the speaker. Label a cross-passage inference as a synthesis.
+- Keep names, figures, dates, and units exact when confirmed; otherwise omit or qualify them.
+- Introduce participants only when source metadata or introductions establish their identity. Do not guess credentials or biographies.
+- Include up to three short exact quotes only when their wording adds value.
+- Include optional `open_questions` only for questions genuinely raised but left unresolved in the episode. They are not the Agent's speculative list of future research topics.
+- Do not force action advice onto stories, fiction, comedy, history, or cultural discussions.
+- Write in the user's language. Preserve original technical terms when translation would obscure meaning.
 
-- publication date and historical context;
-- definitions and scope;
-- comparable claims and evidence;
-- speaker incentives/roles;
-- agreements, contradictions, and evolution;
-- confidence and transcript quality.
+A 3–5 minute reading target is an editorial target, not a guarantee based on runtime or word count. Do not fill available space just because the validator allows it.
 
-Do not treat a later difference as contradiction when facts or context changed.
+## 5. Evidence and completion
 
-## Fact-check
+Write `evidence.json` using the [output contract](output-schema.md). Reference source segments for the takeaway, each quick answer, and each insight. Cite all distant passages used in a synthesis. Time ranges must come from the actual transcript; untimed sources use segment IDs without fabricated times.
 
-For each selected claim:
+Run `finalize_bundle.py`, then `validate_bundle.py`. In `summary` mode, finalization generates `summary.md`, a compatibility `analysis.md`, and `reader.html` from the same validated evidence. Deliver the first and last of these with clickable links.
 
-1. Quote or paraphrase the episode claim with timestamp.
-2. Normalize it into a verifiable proposition.
-3. Define date, geography, population, and metric.
-4. Research authoritative current sources.
-5. Label `supported`, `mixed`, `contradicted`, `outdated`, or `not verifiable`.
-6. Explain the gap without rewriting what the episode originally said.
+Check the result as a reader:
 
-## Learning and repurposing
+- Can I identify the episode's central question within a few seconds?
+- Do the questions express real stakes and give direct answers?
+- Does each insight contain something specific worth retaining?
+- Are reasoning, boundaries, and disagreements preserved where they change meaning?
+- Does the result cover the episode rather than just an opening segment or search result?
+- Can each main point be checked against its source?
+- Can I finish the summary in a few minutes without reading processing details?
 
-Learning outputs may include definitions, concept relationships, recall questions, application exercises, and flashcards. Generated examples must be labeled as generated.
+`ready_for_analysis` means the source is ready. Only successful finalization and validation justify calling the summary complete.
 
-Repurposed articles, newsletters, show notes, and posts are transformations. Preserve attribution, avoid fabricated quotes, and do not make the rewritten voice appear to be the speaker's exact words.
+## Legacy compatibility
+
+`quick`, `standard`, and `deep` are retained for callers that explicitly request the old contracts. They are not recommended alternatives for a normal podcast-summary request. Existing report integrations can keep their original `analysis.md`, claim ledger, and evidence structures; the default product follows the workflow above.

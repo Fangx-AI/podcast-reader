@@ -12,6 +12,7 @@ import sys
 from typing import Any
 
 from runtime_utils import atomic_write_json
+from validate_bundle import validate as validate_bundle
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -124,13 +125,20 @@ def process(args: argparse.Namespace, progress: Progress) -> dict[str, Any]:
         if (episode_dir / "transcript.json").is_file():
             run_helper("assess_transcript.py", [str(episode_dir / "transcript.json"), "--output", str(episode_dir / "transcript-quality.json")])
             quality = str(episode_dir / "transcript-quality.json")
-        if bundle.get("status") == "ready_for_analysis":
+        reusable = (
+            bundle.get("status") == "analyzed"
+            and bundle.get("analysis_mode") == args.analysis_mode
+            and bundle.get("output_language") == args.output_language
+            and validate_bundle(episode_dir)["valid"]
+        )
+        if not reusable:
             run_helper("create_analysis_contract.py", [str(episode_dir), "--mode", args.analysis_mode, "--output-language", args.output_language])
             handoff = str(episode_dir / "analysis-handoff.json")
-            progress.emit("handoff", "complete", "Transcript ready; current Agent must complete the analysis contract", 100.0)
+            bundle["status"] = "ready_for_analysis"
+            progress.emit("handoff", "complete", "Transcript ready; current Agent must write the summary before delivery", 100.0)
         else:
-            progress.emit("complete", "complete", "Analyzed bundle is ready", 100.0)
-        return {"status": bundle["status"], "episode_dir": str(episode_dir), "bundle": str(episode_dir / "bundle.json"), "progress": str(progress.path), "quality": quality, "analysis_handoff": handoff, "api_key_required": False}
+            progress.emit("complete", "complete", "Validated summary is ready", 100.0)
+        return {"status": bundle["status"], "episode_dir": str(episode_dir), "bundle": str(episode_dir / "bundle.json"), "progress": str(progress.path), "quality": quality, "analysis_handoff": handoff, "summary": str(episode_dir / "summary.md") if reusable and (episode_dir / "summary.md").is_file() else None, "reader": str(episode_dir / "reader.html") if reusable else None, "api_key_required": False}
     if bundle.get("status") != "needs_transcription" or args.no_transcribe:
         progress.emit("transcription", "skipped", "No automatic local transcription was run")
         return {"status": bundle.get("status"), "episode_dir": str(episode_dir), "bundle": str(episode_dir / "bundle.json"), "progress": str(progress.path), "next_actions": bundle.get("next_actions", [])}
@@ -184,7 +192,7 @@ def process(args: argparse.Namespace, progress: Progress) -> dict[str, Any]:
     if bundle.get("status") == "ready_for_analysis":
         run_helper("create_analysis_contract.py", [str(episode_dir), "--mode", args.analysis_mode, "--output-language", args.output_language])
         handoff = str(episode_dir / "analysis-handoff.json")
-        progress.emit("handoff", "complete", "Transcript ready; current Agent must complete the analysis contract", 100.0)
+        progress.emit("handoff", "complete", "Transcript ready; current Agent must write the summary before delivery", 100.0)
     return {
         "status": bundle.get("status"),
         "episode_dir": str(episode_dir),
@@ -209,7 +217,7 @@ def main() -> int:
     parser.add_argument("--acquire-mode", choices=("auto", "metadata", "subtitles", "audio", "video", "all"), default="auto")
     parser.add_argument("--model", default="small")
     parser.add_argument("--language", default="auto")
-    parser.add_argument("--analysis-mode", choices=("quick", "standard", "deep"), default="standard")
+    parser.add_argument("--analysis-mode", choices=("summary", "quick", "standard", "deep"), default="summary", help="Concise summary by default; older analysis modes remain available for compatibility")
     parser.add_argument("--output-language", default="user-language")
     parser.add_argument("--beam-size", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=4)

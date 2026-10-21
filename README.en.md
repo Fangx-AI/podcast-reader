@@ -6,7 +6,7 @@
 
 ## Turn any accessible podcast into a summary you can read in 3–5 minutes
 
-**Send a link. See which questions matter, why they matter, and how far the episode answers them.**
+**Send a link. Read a short answer, the most valuable details, and any remaining gap directly beneath each key question.**
 
 [![Release](https://img.shields.io/github/v/release/Fangx-AI/podcast-reader?style=flat-square&color=c9a750)](https://github.com/Fangx-AI/podcast-reader/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/Fangx-AI/podcast-reader/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Fangx-AI/podcast-reader/actions/workflows/ci.yml)
@@ -31,7 +31,7 @@ No mode selection or setup interview is needed. You can also provide audio, vide
 
 ## What you get
 
-![Dark and gold podcast summary preview](docs/assets/summary-preview.jpg)
+![Dark and gold podcast summary preview](docs/assets/question-answer-preview.png)
 
 [Open the complete HTML example](docs/examples/summary-preview.html). The preview uses an original fictional episode to demonstrate the layout; it is not a summary of a real interview.
 
@@ -40,7 +40,7 @@ No mode selection or setup interview is needed. You can also provide audio, vide
 | Section | Purpose |
 |---|---|
 | **Core question and one-sentence takeaway** | Understand the problem the episode tries to resolve and its main response |
-| **Key questions** | Usually 3–6 concrete questions with source-supported stakes; distinguish questions explicitly asked from those synthesized from the discussion |
+| **Key questions** | Usually 3–6 concrete questions, each immediately followed by a short answer and 1–3 valuable details; distinguish explicit from synthesized questions |
 | **Answers and gaps** | Mark answered, partially answered, or unanswered, and specify what remains missing |
 | **High-value insights** | Add mechanisms, examples, methods, and boundaries that deepen the questions without repeating their answers |
 | **Participants** | Identify who is speaking using source-confirmed information |
@@ -57,7 +57,7 @@ The two main deliverables are:
 - **`summary.md`** — a concise summary to save, copy, or share.
 - **`reader.html`** — a responsive dark and gold card layout, with the summary first and source text available when needed.
 
-Read the core question and question cards first, then the insights that support them; participant and source details follow. The reader offers copy and Markdown save controls, with a manual copy fallback when the browser blocks clipboard access. A sticky section menu helps navigation, source references let you return to your previous summary position, and cards use one column on mobile. Links to an episode's exact time depend on its platform and available timestamps.
+Read the core question and takeaway first. Each question then shows its short answer, concrete examples or key conditions, and any remaining gap directly underneath, without expanding a card or jumping from a question-only index. Participant and source details follow. The reader offers copy and Markdown save controls, with a manual copy fallback when the browser blocks clipboard access. A sticky section menu helps navigation, source references let you return to your previous summary position, and cards use one column on mobile. Links to an episode's exact time depend on its platform and available timestamps.
 
 Real timestamps are preserved. Untimed TXT and Markdown sources use segment references instead of invented times.
 

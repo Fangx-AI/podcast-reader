@@ -129,9 +129,8 @@ LABELS = {
         "reading_basis": "按摘要正文约 400 中文字或 200 英文词／分钟估算，不含逐字稿。",
         "pending_title": "总结尚未生成", "stale": "这份摘要尚未完成校验，内容可能仍在更新。",
         "reference": "依据",
-        "core_question": "本期核心问题", "question_index": "本期关键问题",
-        "question_index_hint": "选择一个问题，往下看", "question_details": "逐题看：回答与未解之处",
-        "why_it_matters": "为什么值得问", "episode_answer": "节目回答", "gap": "仍缺什么",
+        "core_question": "本期核心问题", "key_points": "最有价值的信息",
+        "why_it_matters": "为什么值得问", "episode_answer": "省流答案", "gap": "这期没讲清楚",
         "answered": "节目有回答", "partial": "部分回答", "unanswered": "未解答",
         "explicit": "节目中提出", "synthesized": "由内容提炼",
     },
@@ -164,9 +163,8 @@ LABELS = {
         "reading_basis": "Estimated at 400 Chinese characters or 200 English words per minute; transcript excluded.",
         "pending_title": "Summary not yet generated", "stale": "This summary has not finished validation and may still be updated.",
         "reference": "Source",
-        "core_question": "The episode's central question", "question_index": "Key questions",
-        "question_index_hint": "Choose a question to explore", "question_details": "The answers — and what is still missing",
-        "why_it_matters": "Why ask this", "episode_answer": "The episode's answer", "gap": "What is still missing",
+        "core_question": "The episode's central question", "key_points": "Most valuable details",
+        "why_it_matters": "Why ask this", "episode_answer": "Short answer", "gap": "What is still missing",
         "answered": "Answered in the episode", "partial": "Partially answered", "unanswered": "Unanswered",
         "explicit": "Raised in the episode", "synthesized": "Drawn from the discussion",
     },
@@ -188,13 +186,20 @@ def markdown_summary(evidence: dict[str, Any], bundle: dict[str, Any], transcrip
     for item in records(digest.get("quick_takes")):
         if item.get("question"):
             lines.extend([f"### {literal(item['question'])}", ""])
+            if item.get("answer"):
+                lines.extend([f"**{labels['episode_answer']}**", "", literal(item["answer"]), ""])
+            if strings(item.get("key_points")):
+                lines.extend([f"**{labels['key_points']}**", ""])
+                lines.extend(f"- {literal(value)}" for value in strings(item["key_points"]))
+                lines.append("")
+            if item.get("gap"):
+                lines.extend([f"**{labels['gap']}**", "", literal(item["gap"]), ""])
             for field in ("answer_status", "question_origin"):
                 value = item.get(field)
                 if isinstance(value, str) and value in {"answered", "partial", "unanswered", "explicit", "synthesized"}:
                     lines.extend([labels[value], ""])
-            for field, label in (("why_it_matters", "why_it_matters"), ("answer", "episode_answer"), ("gap", "gap")):
-                if item.get(field):
-                    lines.extend([f"**{labels[label]}**", "", literal(item[field]), ""])
+            if item.get("why_it_matters"):
+                lines.extend([f"**{labels['why_it_matters']}**", "", literal(item["why_it_matters"]), ""])
     insights = records(digest.get("insights")) or [
         {"title": item.get("claim"), "summary": item.get("speaker")}
         for item in records(evidence.get("claims")) if item.get("claim")
@@ -243,6 +248,10 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
     episode = evidence.get("episode") if isinstance(evidence.get("episode"), dict) else {}
     resolution = bundle.get("resolution") if isinstance(bundle.get("resolution"), dict) else {}
     digest = evidence.get("digest") if isinstance(evidence.get("digest"), dict) else {}
+    if any(strings(item.get("key_points")) for item in records(digest.get("quick_takes"))):
+        labels["insights"] = "Additional insights" if english else "补充洞察"
+        labels["nav_insights"] = labels["insights"]
+        labels["insights_count"] = "{n} additional insights" if english else "{n} 条补充洞察"
     source_url = next((url for value in (episode.get("source_url"), bundle.get("source_input"), resolution.get("webpage_url"), resolution.get("url")) if (url := safe_source_url(value))), None)
     original_title = str(episode.get("title") or resolution.get("title") or episode_dir.name)
     core_question = digest.get("core_question")
@@ -323,7 +332,6 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
         labels["participants"] = "本期人物"
 
     quick_rows = []
-    question_links = []
     for item in records(digest.get("quick_takes")):
         if not item.get("question"):
             continue
@@ -331,16 +339,13 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
         answer_status, question_origin = item.get("answer_status"), item.get("question_origin")
         status_html = f'<span class="question-status" data-answer-status="{answer_status}">{esc(labels[answer_status])}</span>' if isinstance(answer_status, str) and answer_status in {"answered", "partial", "unanswered"} else ""
         origin_html = f'<span class="question-origin" data-question-origin="{question_origin}">{esc(labels[question_origin])}</span>' if isinstance(question_origin, str) and question_origin in {"explicit", "synthesized"} else ""
-        question_meta = f'<div class="question-meta">{status_html}{origin_html}</div>' if status_html or origin_html else ""
+        question_meta = f'<div class="question-meta">{origin_html}</div>' if origin_html else ""
         why_html = f'<p class="question-why"><span class="field-label">{esc(labels["why_it_matters"])}</span>{esc(item["why_it_matters"])}</p>' if item.get("why_it_matters") else ""
-        answer_html = f'<div class="question-answer"><span class="field-label">{esc(labels["episode_answer"])}</span><p class="answer">{esc(item["answer"])}</p></div>' if item.get("answer") else ""
+        answer_html = f'<div class="question-answer"><div class="answer-heading"><span class="field-label">{esc(labels["episode_answer"])}</span>{status_html}</div><p class="answer">{esc(item["answer"])}</p></div>' if item.get("answer") else status_html
+        points = strings(item.get("key_points"))
+        points_html = f'<div class="question-points"><span class="field-label">{esc(labels["key_points"])}</span><ul>{"".join(f"<li>{esc(point)}</li>" for point in points)}</ul></div>' if points else ""
         gap_html = f'<div class="question-gap"><span class="field-label">{esc(labels["gap"])}</span><p>{esc(item["gap"])}</p></div>' if item.get("gap") else ""
-        quick_rows.append(f'<article id="question-{number}" class="card quick-card" tabindex="-1" aria-labelledby="question-{number}-title"><h3 id="question-{number}-title" class="question"><span class="question-number">{number:02d}</span>{esc(item["question"])}</h3>{question_meta}{why_html}{answer_html}{gap_html}{references(item.get("evidence"), mark_missing=True)}</article>')
-        unresolved = f'<span class="index-answer-status" data-answer-status="{answer_status}">{esc(labels[answer_status])}</span>' if isinstance(answer_status, str) and answer_status in {"partial", "unanswered"} else ""
-        question_links.append(f'<li><a class="question-jump" href="#question-{number}"><span class="question-index-number" aria-hidden="true">{number:02d}</span><span class="question-index-text">{esc(item["question"])}{unresolved}</span><span class="question-index-arrow" aria-hidden="true">↘</span></a></li>')
-    question_index = f'<nav id="question-index" class="question-index" aria-labelledby="question-index-title"><div class="question-index-heading"><h2 id="question-index-title">{esc(labels["question_index"])}</h2><span>{esc(labels["question_index_hint"])}</span></div><ol>{"".join(question_links)}</ol></nav>' if question_links else ""
-    if question_links:
-        labels["quick"] = labels["question_details"]
+        quick_rows.append(f'<article id="question-{number}" class="card quick-card" tabindex="-1" aria-labelledby="question-{number}-title"><h3 id="question-{number}-title" class="question"><span class="question-number">{number:02d}</span>{esc(item["question"])}</h3>{answer_html}{points_html}{gap_html}<div class="question-context">{why_html}{question_meta}{references(item.get("evidence"), mark_missing=True)}</div></article>')
 
     insights = records(digest.get("insights"))
     if not insights:
@@ -466,8 +471,8 @@ def render(episode_dir: Path, output: Path, *, include_transcript: bool = True,
 <link rel="icon" href="data:,">
 <meta name="description" content="{esc(takeaway)}"><title>{esc(title)} · Podcast Reader</title><style>{STYLE}</style></head>
 <body id="top"><a class="skip" href="#summary">{esc(labels["skip"])}</a><div class="page">
-<header class="hero{" question-led" if question_links else ""}"><div class="eyebrow">{esc(labels["core_question"] if core_question else labels["brand"])}</div><h1>{esc(title)}</h1>{subtitle}<div class="metadata">{"".join(metadata)}</div>
-{question_index}{takeaway_html}{reading_stats}{toolbar}{feedback}{fallback}</header>{nav}
+<header class="hero{" question-led" if quick_rows else ""}"><div class="eyebrow">{esc(labels["core_question"] if core_question else labels["brand"])}</div><h1>{esc(title)}</h1>{subtitle}<div class="metadata">{"".join(metadata)}</div>
+{takeaway_html}{reading_stats}{toolbar}{feedback}{fallback}</header>{nav}
 <main id="summary" tabindex="-1">{summary_content}{details}</main>
 <footer><span>{esc(labels["footer"])}</span><a href="#top">{esc(labels["top"])} ↑</a></footer></div>{payload}{script_tag}</body></html>"""
     output = output.expanduser().resolve()

@@ -83,6 +83,7 @@ Supported method values include `publisher_transcript`, `human_captions`, `platf
         "question_origin": "synthesized",
         "answer_status": "partial",
         "answer": "The direct answer, followed by its essential reason or caveat.",
+        "key_points": ["A concrete source-backed mechanism, example, distinction or condition that adds to the answer."],
         "gap": "The condition, evidence or decision threshold the episode leaves unresolved.",
         "evidence": [{"start": "00:00:01", "end": "00:00:05", "segment_ids": [1]}]
       }
@@ -119,6 +120,7 @@ Supported method values include `publisher_transcript`, `human_captions`, `platf
 | `evidence` | 1–12 references supporting the core question and takeaway; each answer and insight uses the same reference-list bounds |
 | `participants` | Optional list, at most 8; required name at most 100 characters, optional role at most 100, optional description at most 300; all must come from source metadata or introductions |
 | `quick_takes` | 1–6 question/answer items, each with nonempty evidence; questions at most 160 characters, answers at most 500 |
+| `quick_takes[].key_points` | Optional for compatibility; when supplied, 1–3 nonempty strings, each at most 300 characters. New cards should supply the most valuable details supported by that card's `evidence`; omit when no further source-backed detail exists |
 | `quick_takes[].why_it_matters` | Nonempty string at most 300 characters; required when `core_question` is present |
 | `quick_takes[].question_origin` | `explicit` for a question actually raised in the episode, or `synthesized` for an editorial question derived from its discussion; required when `core_question` is present |
 | `quick_takes[].answer_status` | `answered`, `partial`, or `unanswered`; required when `core_question` is present. This describes what the episode answers, not whether that answer is externally verified |
@@ -142,7 +144,7 @@ Use `kind` labels only when they help a reader scan; there is no requirement to 
 
 ### Evidence references
 
-The core question, takeaway, each question's answer and boundaries, and each insight must cite source segments. The core question shares `digest.evidence` with the takeaway. A typical timed reference is:
+The core question, takeaway, each question's answer, key points and boundaries, and each insight must cite source segments. A question's `key_points` use that card's `evidence`; include every passage needed to support them. The core question shares `digest.evidence` with the takeaway. A typical timed reference is:
 
 ```json
 {"start": "00:12:10", "end": "00:12:38", "segment_ids": [42, 43]}
@@ -200,7 +202,7 @@ Quote count is at most 3 in the default summary, each at most 500 characters. Ea
 
 ## Rendering and validation
 
-Use [the editorial template](../assets/analysis-template.md) and [the summary workflow](analysis-workflows.md). The reading order is: title → **the episode's core question** → **numbered question list with the episode's answer statuses** → one-sentence takeaway → each question's importance, source-grounded answer, unresolved gap when applicable, and original references → supporting high-value insights. Source metadata and supporting material follow the main reading sequence. Legacy summaries show their question list without an invented core question or answer status. Chinese and English outputs follow the same structure.
+Use [the editorial template](../assets/analysis-template.md) and [the summary workflow](analysis-workflows.md). The reading order is: title → **the episode's core question** → one-sentence takeaway → **each numbered question immediately followed by its short answer and most valuable details** → unresolved gap when applicable → question importance, origin and source references → supporting high-value insights. Do not duplicate the questions as a bare list requiring another jump to find their answers. All answer text and key points remain visible without expanding a disclosure. Source metadata and supporting material follow the main reading sequence. Legacy summaries retain their answers without invented key points, core questions or answer statuses. Chinese and English outputs follow the same structure.
 
 ```text
 python "{skill_dir}/scripts/finalize_bundle.py" <episode_dir>

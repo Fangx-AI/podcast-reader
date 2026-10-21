@@ -82,13 +82,13 @@ Question identification is the main workflow, not a label added to finished conc
 4. Make every question understandable in isolation: retain its subject, tension and relevant conditions. Reject generic questions such as “从哪开始？” / “Where to start?” or “有哪些启示？” / “What are the lessons?”. Do not shorten away the actual problem to hit a character target.
 5. Explain `why_it_matters` using stakes supported by the source. Do not invent audience motives, benefits or harms.
 6. Re-read the response and later follow-ups against the question's full scope. Set `answer_status` to `answered`, `partial`, or `unanswered`. This describes what the episode addresses, not whether its claims are true or externally verified.
-7. Write the answer the source actually gives. For `partial` or `unanswered`, add a nonempty `gap` explaining precisely what is missing; for `answered`, omit `gap`. Do not create a confident answer where the episode leaves one open, or manufacture an unresolved card just to show every status.
+7. Write the answer the source actually gives. Place this short answer immediately below its question, then add `key_points` with 1–3 concrete, source-backed mechanisms, examples, useful distinctions or conditions. These details should add information beyond the short answer, using the same card's evidence. For `partial` or `unanswered`, add a nonempty `gap` explaining precisely what is missing; for `answered`, omit `gap`. Do not create a confident answer where the episode leaves one open, or manufacture details or an unresolved card to fill a layout.
 8. Cite the passages supporting the question, its stakes, response and remaining gap. Include every relevant distant passage; a synthesized question cites the discussion from which it was derived.
 9. Only then select insights that deepen these questions with a mechanism, useful example, method, counterintuitive finding, exception or disagreement. Merge or omit anything that merely repeats a question card.
 
 Usually aim for 3–6 key questions and 3–7 insights; use fewer for short or sparse material. Keep narrative, cultural, comedic, or fictional content faithful to its own substance. Do not force business lessons, advice, named participants, statistics, or quotations into every episode.
 
-In the first 30 seconds, the reader should see the core question, why the selected questions matter, and which ones the episode answers. Answers can often fit in 30–60 Chinese characters, but their true scope and decisive caveats take priority over length. Keep important incomplete answers in the question cards, not hidden in an optional footer.
+In the first 30 seconds, the reader should see the core question and the selected questions with their short answers and most valuable details directly underneath. Do not require a jump from a bare question list to another answer section. Answers can often fit in 30–60 Chinese characters, but their true scope and decisive caveats take priority over length. Keep important incomplete answers in the question cards, not hidden in an optional footer. Place why-it-matters, question origin and source references after the answer, details and gap.
 
 Before writing the final evidence, compare the takeaway, questions, insights, and optional sections side by side. Remove repeated explanations. Keep a quote only if its wording is worth retaining; keep an action only if it adds a useful next step; keep a participant description only if it helps interpret the discussion. Optional sections are not a completion checklist.
 
@@ -101,6 +101,7 @@ In default `summary` mode, write **`evidence.json` only** as the authored summar
 - `headline`, required `core_question`, `takeaway`, and `evidence` supporting the central question and takeaway;
 - optional source-confirmed `participants`;
 - `quick_takes`: required `question`, `why_it_matters`, `question_origin`, `answer_status`, `answer`, and `evidence`; also `gap` for partial/unanswered questions, with no `gap` for answered ones;
+- each newly authored question card should also include `key_points`: 1–3 nonempty strings, at most 300 characters each, with the most valuable source-backed information for that question. It is optional for legacy compatibility; omit it when the source provides no additional detail instead of inventing content;
 - `insights`: titles, explanations, optional concise bullets/kinds, and evidence;
 - legacy optional `open_questions`; for new summaries, use question cards with answer status and a gap instead of duplicating unresolved questions here.
 

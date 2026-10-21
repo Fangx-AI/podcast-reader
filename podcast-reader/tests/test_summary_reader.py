@@ -273,6 +273,7 @@ class SummaryReaderTests(unittest.TestCase):
                 "question_origin": "explicit",
                 "answer_status": "partial",
                 "answer": "节目没有给出统一次数。",
+                "key_points": ["用实际任务检查结果。", "出现错误时保留人工接管。"],
                 "gap": "仍缺少可操作的稳定判据。",
                 "evidence": reference,
             }],
@@ -282,13 +283,22 @@ class SummaryReaderTests(unittest.TestCase):
             }],
         }}
 
-    def test_questions_precede_takeaway_and_link_to_complete_answer_cards(self):
+    def test_questions_show_answers_and_valuable_details_without_duplicate_index(self):
         with tempfile.TemporaryDirectory() as folder:
             _, page, parsed = self.build(Path(folder), self.question_evidence())
         self.assertIn("<h1>怎样判断 AI 工作流已经稳定？</h1>", page)
-        self.assertLess(page.index('id="question-index"'), page.index('class="takeaway"'))
-        self.assertIn("#question-1", parsed.hrefs)
+        self.assertNotIn('id="question-index"', page)
         self.assertIn("question-1", parsed.ids)
+        card = page.split('<article id="question-1"', 1)[1].split('</article>', 1)[0]
+        self.assertNotIn('<details', card)
+        order = ['class="question"', 'class="question-answer"', 'class="question-points"',
+                 'class="question-gap"', 'class="question-context"']
+        positions = [card.index(value) for value in order]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("省流答案", card)
+        self.assertIn("最有价值的信息", card)
+        self.assertIn("<li>用实际任务检查结果。</li>", card)
+        self.assertIn("1 条补充洞察", page)
         self.assertIn("这决定是否适合开始自动化。", page)
         self.assertIn("仍缺少可操作的稳定判据。", page)
         self.assertTrue(parsed.question_statuses)
@@ -303,8 +313,18 @@ class SummaryReaderTests(unittest.TestCase):
             self.assertIn(evidence["digest"]["quick_takes"][0][field], page)
             self.assertIn(evidence["digest"]["quick_takes"][0][field], "".join(parsed.markdown))
         self.assertNotIn("可靠评估让产品真正可用。", "".join(parsed.markdown))
-        self.assertIn("#question-1", parsed.hrefs)
+        for point in evidence["digest"]["quick_takes"][0]["key_points"]:
+            self.assertIn(point, page)
+            self.assertIn(point, "".join(parsed.markdown))
         self.assertNotIn("#segment-1", parsed.hrefs)
+
+    def test_english_answer_cards_include_details_and_gap_labels(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, page, _ = self.build(Path(folder), self.question_evidence(), extra={"output_language": "en"})
+        self.assertIn("Short answer", page)
+        self.assertIn("Most valuable details", page)
+        self.assertIn("What is still missing", page)
+        self.assertNotIn("最有价值的信息", page)
 
     def test_old_questions_do_not_gain_fabricated_answer_status(self):
         evidence = {"digest": {"quick_takes": [{
@@ -321,6 +341,7 @@ class SummaryReaderTests(unittest.TestCase):
         evidence["digest"]["core_question"] = attack
         for key in ("why_it_matters", "gap"):
             evidence["digest"]["quick_takes"][0][key] = attack
+        evidence["digest"]["quick_takes"][0]["key_points"] = [attack]
         with tempfile.TemporaryDirectory() as folder:
             _, page, parsed = self.build(Path(folder), evidence)
         self.assertNotIn(attack, page)

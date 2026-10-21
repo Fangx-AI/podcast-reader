@@ -224,9 +224,12 @@ def validate_digest(evidence: Any, transcript: Any, required: bool = False, *,
         if not isinstance(item, dict):
             errors.append(f"{label}: must be an object")
             continue
-        fields(item, {"question", "answer", "evidence", "why_it_matters", "question_origin", "answer_status", "gap"}, label)
+        fields(item, {"question", "answer", "key_points", "evidence", "why_it_matters", "question_origin", "answer_status", "gap"}, label)
         text(item.get("question"), f"{label}.question", 160)
         text(item.get("answer"), f"{label}.answer", 500)
+        if "key_points" in item:
+            for point_index, point in enumerate(items(item["key_points"], f"{label}.key_points", 3, minimum=1)):
+                text(point, f"{label}.key_points[{point_index}]", 300)
         if isinstance(item.get("question"), str):
             question_key = _question_key(item["question"])
             if question_key in seen_questions:
@@ -406,30 +409,29 @@ def render_markdown(evidence: dict[str, Any], bundle: dict[str, Any],
         {"explicit": "Explicitly raised in the episode", "synthesized": "Synthesized from the episode's discussion"} if english else
         {"explicit": "节目明确提出", "synthesized": "根据节目讨论归纳"}
     )
-    lines.extend([label("## 本期问题清单", "## Questions in this episode"), ""])
-    for number, item in enumerate(digest["quick_takes"], 1):
-        status = item.get("answer_status")
-        status_text = label(" — 节目回答状态：", " — Episode answer status: ") + status_labels[status] if status in status_labels else ""
-        lines.append(f"{number}. {_escape(item['question'])}{status_text}")
-    lines.append("")
     lines.extend([label("## 一句话总结", "## One-sentence takeaway"), "", _escape(digest["takeaway"]), "",
                   _citations(digest["evidence"], segments, english), ""])
-    lines.extend([label("## 关键问题 · 逐题解读", "## Key questions · Answers and gaps"), ""])
+    lines.extend([label("## 关键问题 · 直接看答案", "## Key questions · Direct answers"), ""])
     for number, item in enumerate(digest["quick_takes"], 1):
         lines.extend([f"### {number}. {_escape(item['question'])}", ""])
-        if item.get("question_origin"):
-            lines.extend([label("问题来源：", "Question origin: ") + origin_labels[item["question_origin"]], ""])
-        if item.get("why_it_matters"):
-            lines.extend([label("**为什么重要：** ", "**Why it matters:** ") + _escape(item["why_it_matters"]), ""])
         status = item.get("answer_status")
-        answer_label = label("**节目回答", "**Episode answer")
+        answer_label = label("**省流答案", "**Short answer")
         if status in status_labels:
             answer_label += label("（", " (") + status_labels[status] + label("）", ")")
         lines.extend([answer_label + label("：** ", ":** ") + _escape(item["answer"]), ""])
+        if item.get("key_points"):
+            lines.extend([label("**最有价值的信息：**", "**Most valuable details:**"), ""])
+            lines.extend(f"- {_escape(point)}" for point in item["key_points"])
+            lines.append("")
         if item.get("gap"):
             lines.extend([label("**仍缺什么：** ", "**What remains missing:** ") + _escape(item["gap"]), ""])
+        if item.get("why_it_matters"):
+            lines.extend([label("**为什么重要：** ", "**Why it matters:** ") + _escape(item["why_it_matters"]), ""])
+        if item.get("question_origin"):
+            lines.extend([label("问题来源：", "Question origin: ") + origin_labels[item["question_origin"]], ""])
         lines.extend([label("原文出处：", "Source evidence: ") + _citations(item["evidence"], segments, english), ""])
-    lines.extend([label("## 高价值信息", "## High-value insights"), ""])
+    insight_heading = label("## 补充洞察", "## Additional insights") if any(item.get("key_points") for item in digest["quick_takes"]) else label("## 高价值信息", "## High-value insights")
+    lines.extend([insight_heading, ""])
     for number, item in enumerate(digest["insights"], 1):
         kind_labels = ENGLISH_INSIGHT_KINDS if english else INSIGHT_KINDS
         kind = f" · {kind_labels[item['kind']]}" if item.get("kind") else ""

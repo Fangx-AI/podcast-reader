@@ -2,7 +2,7 @@
 
 The default task is a concise, evidence-backed podcast summary organized around **the important questions, why they matter, and how far the episode answers them**. Identify the questions before drafting answers or selecting insights.
 
-The main sequence is: **read the complete material → establish the core question → collect candidate questions → rank and merge → verify answer coverage → add supporting insights**. In the first 30 seconds, readers should see what is at stake and where the episode has or lacks an answer. A closer read adds evidence, mechanisms, examples and exceptions.
+The main sequence is: **read the complete material → establish the core question → collect candidate questions → rank and merge → verify answer coverage → add supporting insights**. In the first 30 seconds, readers should see each important question with its short answer and most valuable details directly below it. Do not separate a bare question list from its answers or hide the answers behind a click. A closer read adds source references and background.
 
 For a substantial episode, target approximately **900–1,600 Chinese characters or 500–900 English words** across the visible summary. These are editorial ranges, not minimums, schema limits, or a reason to pad a short episode. The renderer estimates reading time from the finished text; the target does not justify displaying a fixed reading time.
 
@@ -65,6 +65,8 @@ State the precise missing piece in `gap`; do not add a speculative research agen
 
 Lead the answer with the source's actual response. Chinese answers may often fit in 30–60 characters, but the question's full scope and decisive caveats take priority. References must cover the question and its response, including distant passages used to establish why it matters or what remains open.
 
+New question cards should include `key_points`: 1–3 concise, concrete details that make this particular answer useful. Select a mechanism, example, distinction, method or decisive condition supported by the card's `evidence`. Each point is a nonempty string of at most 300 characters. Do not repeat the short answer, add an unrelated insight, or invent content to fill the list. Omit the field if the source gives no additional detail; older cards without it remain valid. The card's reading order is question → short answer → most valuable details → any gap → why it matters and source information.
+
 ## 3. Add information that deepens the selected questions
 
 Select 3–7 high-value insights when the source supports them. Use fewer when it does not. Prefer items with clear relevance, specificity, evidence, and explanatory value.
@@ -82,7 +84,7 @@ Start with a candidate list, then order it by: effect on understanding or decisi
 
 Kinds are optional labels, not six mandatory boxes. If a speaker supplies no numbers or methods, do not invent them. An anecdote can be memorable without proving a general claim. Explain why an insight matters through its substance rather than adding a generic “this is important” sentence.
 
-Remove repetition across quick answers and insights. A quick answer says what the reader needs to know; an insight must add a mechanism, an illustrative calculation, concrete steps, an exception, or disagreement. It should not repeat the answer with more words.
+Remove repetition across short answers, question-level key points and separate insights. A short answer says what the reader needs to know; key points supply the strongest detail directly beneath the relevant question. A separate insight must add a distinct mechanism, illustrative calculation, concrete steps, exception or disagreement that is not already covered. It should not repeat the answer or key points with more words.
 
 For example, if an answer says “Count verification and revision time, not just generation time,” the insight should show a source-supported calculation or a comparison method. A second paragraph saying “The whole process matters” adds no information. If the episode supplies no deeper detail, omit that insight.
 
@@ -113,6 +115,7 @@ Check the result as a reader:
 - Can I identify the episode's central question within a few seconds?
 - After 30 seconds, can I explain the important questions, their stakes, and which ones the episode actually answers?
 - Can I understand every question without its title or neighboring cards?
+- Does every question show its short answer immediately underneath, followed by the strongest source-backed details when available?
 - Are explicit source questions and Agent-derived questions distinguished?
 - Does each answer address its question's actual scope, with a precise gap where it does not?
 - Does each insight add something specific beyond what the answers already told me?

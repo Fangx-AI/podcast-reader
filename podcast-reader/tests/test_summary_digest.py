@@ -42,7 +42,7 @@ class SummaryDigestTests(unittest.TestCase):
         self.assertTrue(result["valid"], result)
         self.assertEqual(result["metrics"]["cited_segments"], 1)
         markdown = render_markdown(self.evidence, {}, self.transcript)
-        for value in ("# 先小步验证", "## 一句话总结", "## 关键问题 · 逐题解读", "## 高价值信息", "## 说明与限制", "[00:00:00–00:00:10]"):
+        for value in ("# 先小步验证", "## 一句话总结", "## 关键问题 · 直接看答案", "## 高价值信息", "## 说明与限制", "[00:00:00–00:00:10]"):
             self.assertIn(value, markdown)
         self.assertNotIn("## 回听章节", markdown)
         self.assertNotIn("## 可以怎么做", markdown)
@@ -214,7 +214,7 @@ class SummaryDigestTests(unittest.TestCase):
         document["digest"]["open_questions"] = ["What remains uncertain?"]
         markdown = render_markdown(document, {"output_language": "en"}, transcript)
         for expected in ("Source:", "Listen to the episode", "## One-sentence takeaway",
-                         "## Key questions · Answers and gaps", "## High-value insights",
+                         "## Key questions · Direct answers", "## High-value insights",
                          "## Participants", "Text segment #1", " · Method",
                          "## Open questions", "## Notes and limitations"):
             self.assertIn(expected, markdown)
@@ -249,15 +249,20 @@ class SummaryDigestTests(unittest.TestCase):
 
     def test_question_first_contract_and_markdown_reading_order(self):
         document = self.question_first_document("partial")
+        document["digest"]["quick_takes"][0]["key_points"] = ["用可观察的结果判断下一步投入。"]
         result = validate_digest(document, self.transcript, required=True)
         self.assertTrue(result["valid"], result)
         markdown = render_markdown(document, {}, self.transcript)
-        sections = ["# 先小步验证", "## 本期核心问题", "## 本期问题清单", "## 一句话总结", "## 关键问题 · 逐题解读", "## 高价值信息"]
+        sections = ["# 先小步验证", "## 本期核心问题", "## 一句话总结", "## 关键问题 · 直接看答案", "## 补充洞察"]
         positions = [markdown.index(section) for section in sections]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("1. 如何开始？ — 节目回答状态：部分回答", markdown)
+        self.assertIn("### 1. 如何开始？\n\n**省流答案（部分回答）：** 先设计一个小实验。", markdown)
+        card = markdown.split("### 1. 如何开始？", 1)[1].split("## 补充洞察", 1)[0]
+        fields = ["**省流答案", "**最有价值的信息", "- 用可观察的结果", "**仍缺什么", "**为什么重要", "问题来源：", "原文出处："]
+        positions = [card.index(field) for field in fields]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(markdown.count("如何开始？"), 1)
         self.assertIn("**为什么重要：**", markdown)
-        self.assertIn("**节目回答（部分回答）：**", markdown)
         self.assertIn("**仍缺什么：**", markdown)
         self.assertIn("问题来源：根据节目讨论归纳", markdown)
         self.assertIn("原文出处：[00:00:00–00:00:10]", markdown)
@@ -265,11 +270,10 @@ class SummaryDigestTests(unittest.TestCase):
     def test_legacy_questions_do_not_receive_invented_core_question_or_status(self):
         self.assertTrue(validate_digest(self.evidence, self.transcript)["valid"])
         markdown = render_markdown(self.evidence, {}, self.transcript)
-        self.assertIn("## 本期问题清单", markdown)
-        self.assertIn("1. 如何开始？", markdown)
+        self.assertIn("### 1. 如何开始？\n\n**省流答案：** 先设计一个小实验。", markdown)
         for absent in ("## 本期核心问题", "节目回答状态", "已回答", "为什么重要", "问题来源："):
             self.assertNotIn(absent, markdown)
-        self.assertLess(markdown.index("## 本期问题清单"), markdown.index("## 一句话总结"))
+        self.assertNotIn("最有价值的信息", markdown)
 
     def test_core_question_and_new_fields_are_typed_bounded_and_required(self):
         for invalid in (None, "", " ", [], "问" * 161):
@@ -333,16 +337,37 @@ class SummaryDigestTests(unittest.TestCase):
         question = document["digest"]["quick_takes"][0]
         question["why_it_matters"] = attack
         question["gap"] = attack
+        question["key_points"] = [attack]
         markdown = render_markdown(document, {"output_language": "en"}, self.transcript)
-        for value in ("## The episode's core question", "## Questions in this episode",
-                      "Episode answer status: Unanswered", "**Why it matters:**",
-                      "**Episode answer (Unanswered):**", "**What remains missing:**",
+        for value in ("## The episode's core question", "**Most valuable details:**", "**Why it matters:**",
+                      "**Short answer (Unanswered):**", "**What remains missing:**",
                       "Question origin: Synthesized from the episode's discussion", "Source evidence:"):
             self.assertIn(value, markdown)
         self.assertNotIn("<script>", markdown)
         self.assertNotIn("[link](javascript:", markdown)
         self.assertNotIn("节目回答状态", markdown)
-        self.assertLess(markdown.index("## Questions in this episode"), markdown.index("## One-sentence takeaway"))
+        self.assertLess(markdown.index("**Short answer"), markdown.index("**Most valuable details"))
+
+    def test_key_points_are_optional_but_supplied_values_are_bounded_and_typed(self):
+        self.assertTrue(validate_digest(self.evidence, self.transcript)["valid"])
+        for points in (["一个具体例子。"], ["字" * 300] * 3):
+            document = self.question_first_document()
+            document["digest"]["quick_takes"][0]["key_points"] = points
+            self.assertTrue(validate_digest(document, self.transcript)["valid"])
+        for points in (None, [], "一个具体例子。", {}, [None], [""], [" "], ["字" * 301], ["要点"] * 4, ["TODO"]):
+            with self.subTest(points=points):
+                document = copy.deepcopy(self.evidence)
+                document["digest"]["quick_takes"][0]["key_points"] = points
+                result = validate_digest(document, self.transcript)
+                self.assertFalse(result["valid"])
+                self.assertTrue(any("key_points" in error for error in result["errors"]))
+
+    def test_key_points_count_toward_the_summary_text_budget(self):
+        document = self.question_first_document()
+        before = validate_digest(document, self.transcript)["metrics"]["text_characters"]
+        document["digest"]["quick_takes"][0]["key_points"] = ["具体例子", "关键条件"]
+        after = validate_digest(document, self.transcript)["metrics"]["text_characters"]
+        self.assertEqual(after - before, 8)
 
     def test_core_question_cannot_bypass_source_reference_checks(self):
         document = self.question_first_document()

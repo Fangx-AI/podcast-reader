@@ -157,18 +157,49 @@ def preserve_raw_transcript(source: Path, episode_dir: Path) -> Path:
     return raw
 
 
+def selected_episode_key(resolution: Any) -> Any:
+    episode = resolution.get("episode") if isinstance(resolution, dict) else None
+    if not isinstance(episode, dict):
+        return None
+    return episode.get("guid") or episode.get("audio_url") or episode.get("title")
+
+
 def ensure_source_record(episode_dir: Path, source_input: str, resolution: dict[str, Any]) -> None:
     target = episode_dir / "source.json"
-    if target.is_file():
-        return
     kind = str(resolution.get("kind") or "")
+    selected_episode = selected_episode_key(resolution)
+    identity = hashlib.sha256(json.dumps(
+        [source_key(source_input), selected_episode], ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
     record = {
         "kind": resolution.get("kind"),
         "source": sanitize_url(source_input, strip_query=kind in {"media_url", "audio_url"}),
+        "source_identity": identity,
         "path": resolution.get("path"),
         "title": (resolution.get("episode") or {}).get("title") if isinstance(resolution.get("episode"), dict) else resolution.get("title"),
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
     }
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            existing = None
+        if isinstance(existing, dict):
+            same_source = existing.get("source_identity") == identity
+            if not existing.get("source_identity"):
+                # Preserve richer metadata written by ingestion adapters when
+                # attaching a transcript to the same source.
+                candidates = [existing.get(key) for key in ("source", "source_url", "canonical_url", "path")]
+                expected = source_key(record["source"])
+                same_source = any(isinstance(value, str) and source_key(value) == expected for value in candidates)
+                if selected_episode and existing.get("title") and existing["title"] != record["title"]:
+                    same_source = False
+            if same_source:
+                for key, value in record.items():
+                    if key not in existing or existing[key] is None:
+                        existing[key] = value
+                atomic_write_json(target, existing)
+                return
     atomic_write_json(target, record)
 
 
@@ -272,7 +303,7 @@ def main() -> int:
     # Transcript attachment is a local resume operation. Reuse the existing
     # resolution so a temporary platform outage cannot block completed work.
     cached_resolution: dict[str, Any] | None = None
-    if args.transcript and args.output_dir:
+    if args.transcript and args.output_dir and not args.query and not args.latest:
         cached_bundle_path = Path(args.output_dir).expanduser().resolve() / "bundle.json"
         if cached_bundle_path.is_file():
             cached_bundle = json.loads(cached_bundle_path.read_text(encoding="utf-8-sig"))
@@ -286,7 +317,8 @@ def main() -> int:
     language_order = [value.strip() for value in args.languages.split(",") if value.strip()]
     if bundle_path.exists() and not args.refresh and not args.transcript:
         existing = json.loads(bundle_path.read_text(encoding="utf-8"))
-        if existing.get("bundle_id") == source_key(args.input) and cache_satisfies(existing, episode_dir, args.mode, language_order):
+        same_episode = selected_episode_key(existing.get("resolution")) == selected_episode_key(resolution)
+        if existing.get("bundle_id") == source_key(args.input) and same_episode and cache_satisfies(existing, episode_dir, args.mode, language_order):
             existing["cache"] = "reused"
             print(json.dumps(existing, ensure_ascii=False, indent=2))
             return 0

@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import socket
@@ -55,6 +56,25 @@ def load_json_object(path: Path) -> dict[str, Any] | None:
     except (OSError, UnicodeError, json.JSONDecodeError):
         return None
     return value if isinstance(value, dict) else None
+
+
+def confirmed_no_speech(document: dict[str, Any]) -> bool:
+    """Accept an empty local result only after completed decoding and VAD."""
+    duration = document.get("duration_seconds")
+    retained = document.get("duration_after_vad_seconds")
+    return (
+        document.get("schema_version") == "2.0"
+        and document.get("status") == "complete"
+        and document.get("provider") == "local:faster-whisper"
+        and document.get("segments") == []
+        and document.get("speech_detected") is False
+        and document.get("no_speech") is True
+        and document.get("vad_filter") is True
+        and isinstance(duration, (int, float)) and not isinstance(duration, bool)
+        and math.isfinite(duration) and duration > 0
+        and isinstance(retained, (int, float)) and not isinstance(retained, bool)
+        and math.isfinite(retained) and retained == 0
+    )
 
 
 def sha256_file(path: Path, block_size: int = 1024 * 1024) -> str:

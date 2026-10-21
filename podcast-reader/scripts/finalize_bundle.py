@@ -12,9 +12,10 @@ from typing import Any
 
 from prepare_episode import artifact_inventory
 from validate_notes import validate as validate_notes
-from runtime_utils import atomic_write_json
+from runtime_utils import atomic_write_json, atomic_write_text, sha256_file
 from evidence_validator import validate_evidence
 from render_reader import render as render_reader
+from summary_digest import render_markdown, validate_digest
 
 
 def load_json(path: Path) -> Any:
@@ -46,7 +47,6 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
     checks = {
         "bundle_exists": bundle_path.is_file(),
         "transcript_exists": transcript_path.is_file(),
-        "analysis_exists": analysis_path.is_file(),
         "evidence_exists": evidence_path.is_file(),
     }
     if not all(checks.values()):
@@ -56,17 +56,7 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
     bundle = load_json(bundle_path)
     transcript = load_json(transcript_path)
     errors: list[str] = []
-
-    analysis_result = validate_notes(analysis_path, strict=True, transcript_path=transcript_path)
-    checks["analysis_strict"] = bool(analysis_result["valid"])
-    if not checks["analysis_strict"]:
-        errors.extend(f"analysis:{failure}" for failure in analysis_result["failures"])
-
-    if summary_path.is_file():
-        summary_result = validate_notes(summary_path, strict=True, transcript_path=transcript_path)
-        checks["summary_strict"] = bool(summary_result["valid"])
-        if not checks["summary_strict"]:
-            errors.extend(f"summary:{failure}" for failure in summary_result["failures"])
+    evidence: dict[str, Any] = {}
 
     if evidence_path.is_file():
         try:
@@ -83,11 +73,41 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
             checks["evidence_references"] = False
             errors.append(f"evidence:{exc}")
 
+    summary_mode = bundle.get("analysis_mode") == "summary" or (
+        not bundle.get("analysis_mode") and isinstance(evidence, dict) and "digest" in evidence
+    )
+    if summary_mode:
+        digest_result = validate_digest(
+            evidence, transcript, required=True,
+            require_questions=bundle.get("question_contract_version") == 1,
+        )
+        checks["summary_grounded"] = digest_result["valid"]
+        errors.extend(f"summary:{item}" for item in digest_result["errors"])
+    else:
+        checks["analysis_exists"] = analysis_path.is_file()
+        if not analysis_path.is_file():
+            errors.append("analysis_exists")
+        else:
+            analysis_result = validate_notes(analysis_path, strict=True, transcript_path=transcript_path)
+            checks["analysis_strict"] = bool(analysis_result["valid"])
+            errors.extend(f"analysis:{failure}" for failure in analysis_result["failures"])
+        if summary_path.is_file():
+            summary_result = validate_notes(summary_path, strict=True, transcript_path=transcript_path)
+            checks["summary_strict"] = bool(summary_result["valid"])
+            errors.extend(f"summary:{failure}" for failure in summary_result["failures"])
+
     if errors:
         return {"episode_dir": str(episode_dir), "checks": checks, "errors": errors, "valid": False}
 
+    if summary_mode:
+        # One validated source of content keeps the two deliverables consistent.
+        markdown = render_markdown(evidence, bundle, transcript)
+        atomic_write_text(summary_path, markdown)
+        atomic_write_text(analysis_path, markdown)
+        checks["summary_written"] = True
+
     try:
-        reader_result = render_reader(episode_dir, episode_dir / "reader.html")
+        reader_result = render_reader(episode_dir, episode_dir / "reader.html", finalized=True)
         checks["reader_rendered"] = reader_result.get("status") == "rendered"
     except Exception as exc:
         checks["reader_rendered"] = False
@@ -97,11 +117,17 @@ def finalize(episode_dir: Path) -> dict[str, Any]:
     bundle["updated_at"] = datetime.now(timezone.utc).isoformat()
     bundle["completed_at"] = bundle["updated_at"]
     bundle["artifacts"] = artifact_inventory(episode_dir)
-    bundle["next_actions"] = ["answer questions using chunks.json"]
-    if evidence_path.is_file():
-        bundle["next_actions"].append("export evidence.json collections to CSV when requested")
+    if summary_mode:
+        bundle["analysis_mode"] = "summary"
+        bundle["deliverables"] = {"summary": "summary.md", "reader": "reader.html"}
+        bundle["deliverable_hashes"] = {
+            name: sha256_file(episode_dir / name) for name in ("summary.md", "reader.html")
+        }
+        bundle["next_actions"] = ["deliver reader.html and summary.md to the user"]
     else:
-        bundle["next_actions"].append("create evidence.json when structured evidence or CSV export is requested")
+        bundle["next_actions"] = ["answer questions using chunks.json"]
+    if not summary_mode and evidence_path.is_file():
+        bundle["next_actions"].append("export evidence.json collections to CSV when requested")
     atomic_write_json(bundle_path, bundle)
 
     checks["bundle_updated"] = True

@@ -12,6 +12,7 @@ import sys
 from typing import Any
 
 from runtime_utils import atomic_write_json
+from validate_bundle import validate as validate_bundle
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -124,13 +125,20 @@ def process(args: argparse.Namespace, progress: Progress) -> dict[str, Any]:
         if (episode_dir / "transcript.json").is_file():
             run_helper("assess_transcript.py", [str(episode_dir / "transcript.json"), "--output", str(episode_dir / "transcript-quality.json")])
             quality = str(episode_dir / "transcript-quality.json")
-        if bundle.get("status") == "ready_for_analysis":
+        reusable = (
+            bundle.get("status") == "analyzed"
+            and bundle.get("analysis_mode") == args.analysis_mode
+            and bundle.get("output_language") == args.output_language
+            and validate_bundle(episode_dir)["valid"]
+        )
+        if not reusable:
             run_helper("create_analysis_contract.py", [str(episode_dir), "--mode", args.analysis_mode, "--output-language", args.output_language])
             handoff = str(episode_dir / "analysis-handoff.json")
-            progress.emit("handoff", "complete", "Transcript ready; current Agent must complete the analysis contract", 100.0)
+            bundle["status"] = "ready_for_analysis"
+            progress.emit("handoff", "complete", "Transcript ready; current Agent must write the summary before delivery", 100.0)
         else:
-            progress.emit("complete", "complete", "Analyzed bundle is ready", 100.0)
-        return {"status": bundle["status"], "episode_dir": str(episode_dir), "bundle": str(episode_dir / "bundle.json"), "progress": str(progress.path), "quality": quality, "analysis_handoff": handoff, "api_key_required": False}
+            progress.emit("complete", "complete", "Validated summary is ready", 100.0)
+        return {"status": bundle["status"], "episode_dir": str(episode_dir), "bundle": str(episode_dir / "bundle.json"), "progress": str(progress.path), "quality": quality, "analysis_handoff": handoff, "summary": str(episode_dir / "summary.md") if reusable and (episode_dir / "summary.md").is_file() else None, "reader": str(episode_dir / "reader.html") if reusable else None, "api_key_required": False}
     if bundle.get("status") != "needs_transcription" or args.no_transcribe:
         progress.emit("transcription", "skipped", "No automatic local transcription was run")
         return {"status": bundle.get("status"), "episode_dir": str(episode_dir), "bundle": str(episode_dir / "bundle.json"), "progress": str(progress.path), "next_actions": bundle.get("next_actions", [])}
@@ -156,6 +164,7 @@ def process(args: argparse.Namespace, progress: Progress) -> dict[str, Any]:
         *[str(path) for path in chunks], "--output-dir", str(transcript_dir),
         "--model", args.model, "--language", args.language,
         "--beam-size", str(args.beam_size), "--batch-size", str(args.batch_size),
+        "--cpu-threads", str(args.cpu_threads),
         "--progress-json", str(episode_dir / "transcription-progress.json"),
         "--chunk-manifest", str(chunks_dir / "audio-chunks.json"),
         "--partial-output", str(episode_dir / "partial-transcript.json"),
@@ -184,7 +193,7 @@ def process(args: argparse.Namespace, progress: Progress) -> dict[str, Any]:
     if bundle.get("status") == "ready_for_analysis":
         run_helper("create_analysis_contract.py", [str(episode_dir), "--mode", args.analysis_mode, "--output-language", args.output_language])
         handoff = str(episode_dir / "analysis-handoff.json")
-        progress.emit("handoff", "complete", "Transcript ready; current Agent must complete the analysis contract", 100.0)
+        progress.emit("handoff", "complete", "Transcript ready; current Agent must write the summary before delivery", 100.0)
     return {
         "status": bundle.get("status"),
         "episode_dir": str(episode_dir),
@@ -209,10 +218,11 @@ def main() -> int:
     parser.add_argument("--acquire-mode", choices=("auto", "metadata", "subtitles", "audio", "video", "all"), default="auto")
     parser.add_argument("--model", default="small")
     parser.add_argument("--language", default="auto")
-    parser.add_argument("--analysis-mode", choices=("quick", "standard", "deep"), default="standard")
+    parser.add_argument("--analysis-mode", choices=("summary", "quick", "standard", "deep"), default="summary", help="Concise summary by default; older analysis modes remain available for compatibility")
     parser.add_argument("--output-language", default="user-language")
     parser.add_argument("--beam-size", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--cpu-threads", type=int, default=0, help="CPU inference threads; 0 keeps the model default")
     parser.add_argument("--segment-minutes", type=float, default=30.0)
     parser.add_argument("--overlap-seconds", type=float, default=1.5)
     parser.add_argument("--no-bootstrap", action="store_true")
@@ -221,8 +231,8 @@ def main() -> int:
     parser.add_argument("--allow-private-network", action="store_true", help="Allow explicitly trusted local/private URL targets")
     parser.add_argument("--force", action="store_true", help="Recreate chunks and local transcripts")
     args = parser.parse_args()
-    if args.beam_size < 1 or args.batch_size < 0 or args.segment_minutes <= 0 or args.overlap_seconds < 0 or args.overlap_seconds >= args.segment_minutes * 60:
-        parser.error("beam size and segment minutes must be positive; batch size cannot be negative")
+    if args.beam_size < 1 or args.batch_size < 0 or args.cpu_threads < 0 or args.segment_minutes <= 0 or args.overlap_seconds < 0 or args.overlap_seconds >= args.segment_minutes * 60:
+        parser.error("beam size and segment minutes must be positive; batch size and cpu threads cannot be negative")
     progress = Progress()
     try:
         result = process(args, progress)

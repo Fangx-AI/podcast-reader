@@ -6,6 +6,8 @@ htmlcov/
 .venv/
 venv/
 outputs/
+output/playwright/
+.playwright-cli/
 work/
 dist/
 *.part

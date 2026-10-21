@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+### Changed
+
+- Focus the product on one default outcome: a podcast summary that takes about 3–5 minutes to read, with key questions, direct answers, and high-value information.
+- Make `summary` the default workflow; keep `quick`, `standard`, and `deep` only for explicitly requested legacy contracts.
+- Have the current Agent author a grounded `digest` in `evidence.json`, then validate and generate `summary.md`, a compatibility `analysis.md`, and `reader.html` from that source.
+- Present a dark and gold card reader with the takeaway, source-confirmed participants, key questions, valuable insights, optional unresolved questions, and original references.
+- Update Chinese and English onboarding, Skill instructions, the editorial template, and output documentation around the summary workflow and honest source-availability limits.
+
+### Added
+
+- Structured summary fields and constraints for takeaway evidence, question/answer cards, insight types, and optional questions the episode leaves unresolved.
+- A fictional original example demonstrating the reading experience without attributing invented content to a real interview.
+- Support for grounded summaries of untimed transcripts using segment references instead of fabricated timestamps.
+
+### Fixed
+
+- Reopen the summary handoff for legacy reports, changed output languages, missing summaries, or damaged reading pages instead of returning stale completion.
+- Omit the embedded full transcript and transcript-search code from the default share HTML, in addition to excluding standalone transcript files.
+
 ## 2.0.1 — 2026-08-31
 
 ### Fixed

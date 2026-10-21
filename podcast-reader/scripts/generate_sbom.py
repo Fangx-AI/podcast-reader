@@ -42,8 +42,8 @@ def generate(output: Path) -> dict:
         "components": components,
         "properties": [
             {"name": "podcast-reader:runtime", "value": "Python 3.10+"},
-            {"name": "podcast-reader:optional-transcription", "value": "faster-whisper==1.2.1"},
-            {"name": "podcast-reader:optional-ingestion", "value": "yt-dlp==2026.08.19 via uv bootstrap; installed command may differ"},
+            {"name": "podcast-reader:optional-transcription", "value": "faster-whisper==1.2.1; av>=11,<19"},
+            {"name": "podcast-reader:optional-ingestion", "value": "yt-dlp==2026.08.19 via uv bootstrap; installed command may differ; explicit bili-cli adapter tested with bilibili-cli==0.6.2"},
         ],
     }
     atomic_write_json(output, document)

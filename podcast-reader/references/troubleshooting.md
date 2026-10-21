@@ -12,6 +12,7 @@ Return available artifacts plus a precise stage and next action. Do not collapse
 | Download | Size/timeout/empty file | Keep no partial file; ask for local export or raise explicit limit |
 | Access | Login/region/paywall/DRM | Stop; request authorized local media/transcript |
 | Transcription | Provider/key/format failure | Explain local configuration; convert audio with FFmpeg if format-only |
+| Transcription | `av.open()` rejects `metadata_errors` | faster-whisper 1.2.1 requires `av>=11,<19`; rerun with `--bootstrap` or use an isolated compatible PyAV environment. Preserve acquired audio and completed chunks. |
 | Diarization | Unstable speakers | Use unknown speaker labels; reduce attribution confidence |
 | Normalize | No segments parsed | Keep raw file; inspect encoding/format; convert to SRT/VTT/JSON |
 | Index | Empty chunks | Validate transcript segments before rerun |

@@ -164,6 +164,7 @@ def process(args: argparse.Namespace, progress: Progress) -> dict[str, Any]:
         *[str(path) for path in chunks], "--output-dir", str(transcript_dir),
         "--model", args.model, "--language", args.language,
         "--beam-size", str(args.beam_size), "--batch-size", str(args.batch_size),
+        "--cpu-threads", str(args.cpu_threads),
         "--progress-json", str(episode_dir / "transcription-progress.json"),
         "--chunk-manifest", str(chunks_dir / "audio-chunks.json"),
         "--partial-output", str(episode_dir / "partial-transcript.json"),
@@ -221,6 +222,7 @@ def main() -> int:
     parser.add_argument("--output-language", default="user-language")
     parser.add_argument("--beam-size", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--cpu-threads", type=int, default=0, help="CPU inference threads; 0 keeps the model default")
     parser.add_argument("--segment-minutes", type=float, default=30.0)
     parser.add_argument("--overlap-seconds", type=float, default=1.5)
     parser.add_argument("--no-bootstrap", action="store_true")
@@ -229,8 +231,8 @@ def main() -> int:
     parser.add_argument("--allow-private-network", action="store_true", help="Allow explicitly trusted local/private URL targets")
     parser.add_argument("--force", action="store_true", help="Recreate chunks and local transcripts")
     args = parser.parse_args()
-    if args.beam_size < 1 or args.batch_size < 0 or args.segment_minutes <= 0 or args.overlap_seconds < 0 or args.overlap_seconds >= args.segment_minutes * 60:
-        parser.error("beam size and segment minutes must be positive; batch size cannot be negative")
+    if args.beam_size < 1 or args.batch_size < 0 or args.cpu_threads < 0 or args.segment_minutes <= 0 or args.overlap_seconds < 0 or args.overlap_seconds >= args.segment_minutes * 60:
+        parser.error("beam size and segment minutes must be positive; batch size and cpu threads cannot be negative")
     progress = Progress()
     try:
         result = process(args, progress)

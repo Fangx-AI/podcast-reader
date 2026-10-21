@@ -10,7 +10,7 @@ import sys
 from typing import Any
 
 from normalize_transcript import parse_json_data
-from runtime_utils import atomic_write_json, load_json_object
+from runtime_utils import atomic_write_json, confirmed_no_speech, load_json_object
 
 
 def combine(manifest_path: Path, transcript_dir: Path, allow_partial: bool = False) -> dict[str, Any]:
@@ -19,6 +19,7 @@ def combine(manifest_path: Path, transcript_dir: Path, allow_partial: bool = Fal
         raise ValueError("audio chunk manifest is missing, invalid, or incomplete")
     combined: list[dict[str, Any]] = []
     missing: list[str] = []
+    no_speech_chunks: list[dict[str, Any]] = []
     for chunk in manifest.get("chunks", []):
         audio = Path(chunk["file"])
         transcript = transcript_dir / f"{audio.stem}.transcript.json"
@@ -32,6 +33,18 @@ def combine(manifest_path: Path, transcript_dir: Path, allow_partial: bool = Fal
             raise ValueError(f"incomplete local transcript cache: {transcript}")
         segments = parse_json_data(document)
         offset = float(chunk.get("global_offset_seconds") or 0)
+        if not segments:
+            if not confirmed_no_speech(document):
+                raise ValueError(f"empty transcript without confirmed VAD no-speech result: {transcript}")
+            duration = float(document["duration_seconds"])
+            no_speech_chunks.append({
+                "chunk_sequence": chunk.get("sequence"),
+                "start_seconds": round(offset, 6),
+                "end_seconds": round(offset + duration, 6),
+                "duration_seconds": duration,
+                "transcript_file": transcript.name,
+            })
+            continue
         for item in segments:
             start = item.get("start_seconds")
             end = item.get("end_seconds")
@@ -46,7 +59,7 @@ def combine(manifest_path: Path, transcript_dir: Path, allow_partial: bool = Fal
             })
     if missing and not allow_partial:
         raise FileNotFoundError("missing chunk transcripts: " + "; ".join(missing))
-    if not combined:
+    if not combined and not no_speech_chunks:
         raise ValueError("no timestamped transcript segments found")
     return {
         "schema_version": "2.0",
@@ -55,6 +68,8 @@ def combine(manifest_path: Path, transcript_dir: Path, allow_partial: bool = Fal
         "completed_chunks": len(manifest.get("chunks", [])) - len(missing),
         "total_chunks": len(manifest.get("chunks", [])),
         "missing_transcripts": [Path(item).name for item in missing],
+        "no_speech_chunks": no_speech_chunks,
+        "speech_detected": bool(combined),
         "segments": combined,
     }
 

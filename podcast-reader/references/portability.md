@@ -25,13 +25,13 @@ It uses the local adapter only when a public transcript is unavailable. Agents w
 
 `doctor.py` distinguishes `offline_ready` (dependencies already installed) from `bootstrap_ready` (the first run still needs network and downloads). Do not describe bootstrap capability as installed readiness.
 
-`scripts/transcribe_local.py` writes timestamped JSON compatible with the normalizer and chunk-combiner. It pins `faster-whisper==1.2.1` for repeatability.
+`scripts/transcribe_local.py` writes timestamped JSON compatible with the normalizer and chunk-combiner. Its bootstrap uses `faster-whisper==1.2.1` with `av>=11,<19`: PyAV 19 removed the `metadata_errors` argument that this faster-whisper version still calls. PyAV 18.1.0 has been verified with real audio decoding on Windows.
 
 ```text
 python "{skill_dir}/scripts/transcribe_local.py" <audio-or-chunks...> --output-dir <transcript-dir> --bootstrap --model small --language auto --beam-size 1 --batch-size 4
 ```
 
-`--bootstrap` requires `uv`; it creates an ephemeral Python 3.12 dependency environment rather than modifying the user's global Python installation. The Whisper model is downloaded and cached on first use. CPU mode uses int8; compatible CUDA environments use float16 automatically and fall back to CPU if automatic GPU initialization fails.
+`--bootstrap` requires `uv`; it creates an ephemeral Python 3.12 dependency environment rather than modifying the user's global Python installation. It also recovers when an installed PyAV 19 or newer is incompatible; without bootstrap, the adapter reports the dependency problem before loading a model. The Whisper model is downloaded and cached on first use. CPU mode uses int8; compatible CUDA environments use float16 automatically and fall back to CPU if automatic GPU initialization fails.
 
 Recommended profiles:
 
@@ -44,6 +44,10 @@ Recommended profiles:
 Local mode does not identify speakers. Preserve `speaker: null` or generic unknown labels. If speaker-aware analysis matters, prefer a host/provider with diarization or add a separately validated diarization lane.
 
 Per-chunk transcript files are reused only after source fingerprints, decoding settings, JSON structure, and completion state match. Audio chunks overlap briefly at speech boundaries and are accepted only when ordered time ranges cover the full source. `--batch-size 4` is the long-form CPU starting point; reduce it on memory-constrained machines.
+
+Both `process_episode.py` and `transcribe_local.py` accept `--cpu-threads` to tune CPU inference. The default `0` retains the model default; an explicit value such as `8` changes execution concurrency without invalidating completed transcript chunks. Measure performance on the host rather than assuming more threads are always faster.
+
+A completed chunk with positive decoded duration and zero speech duration after VAD is saved explicitly as `speech_detected: false`, `no_speech: true`, and an empty segment list. Such an outro or pause counts as a completed chunk and can be reused with the same source fingerprint and settings. The combined result records it in `no_speech_chunks` without inventing text; unconfirmed empty results still fail, and all-no-speech input cannot become an analyzable transcript.
 
 ## Cross-Agent behavior
 

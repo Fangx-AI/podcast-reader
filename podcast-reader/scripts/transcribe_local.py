@@ -15,10 +15,12 @@ import sys
 import time
 from typing import Any
 
-from runtime_utils import atomic_write_json, file_fingerprint, load_json_object, same_fingerprint
+from runtime_utils import atomic_write_json, confirmed_no_speech, file_fingerprint, load_json_object, same_fingerprint
 
 
 PACKAGE_SPEC = "faster-whisper==1.2.1"
+# PyAV 19 removed metadata_errors, still passed by faster-whisper 1.2.1.
+PYAV_SPEC = "av>=11,<19"
 DEFAULT_MODEL = "small"
 
 
@@ -43,7 +45,7 @@ def valid_cached_transcript(target: Path, audio: Path, args: argparse.Namespace)
     if document.get("status") != "complete" or document.get("schema_version") != "2.0":
         return False, "legacy_or_incomplete"
     segments = document.get("segments")
-    if not isinstance(segments, list) or not segments:
+    if not isinstance(segments, list) or (not segments and not confirmed_no_speech(document)):
         return False, "segments_missing"
     if any(not isinstance(item, dict) or not str(item.get("text") or "").strip() for item in segments):
         return False, "segments_invalid"
@@ -103,9 +105,9 @@ def bootstrap_with_uv() -> int:
         print(json.dumps({
             "status": "blocked",
             "stage": "dependency",
-            "error": "faster-whisper is not installed and uv is unavailable",
+            "error": "A compatible transcription environment is required, but uv is unavailable",
             "next_actions": [
-                f"install {PACKAGE_SPEC} in an isolated Python 3.9+ environment",
+                f"install {PACKAGE_SPEC} and {PYAV_SPEC} in an isolated Python 3.12 environment",
                 "rerun this command without --bootstrap",
             ],
         }, ensure_ascii=False, indent=2), file=sys.stderr)
@@ -113,6 +115,7 @@ def bootstrap_with_uv() -> int:
     child_args = [value for value in sys.argv[1:] if value != "--bootstrap"]
     command = [
         uv, "run", "--python", "3.12", "--with", PACKAGE_SPEC,
+        "--with", PYAV_SPEC,
         "python", str(Path(__file__).resolve()), *child_args, "--_uv-child",
     ]
     return subprocess.run(command).returncode
@@ -170,7 +173,7 @@ def transcribe_one(model: Any, audio: Path, args: argparse.Namespace) -> dict[st
     segments, info = model.transcribe(str(audio), **options)
     materialized = [serialize_segment(segment, args.word_timestamps) for segment in segments]
     materialized = [item for item in materialized if item["text"]]
-    return {
+    result = {
         "schema_version": "2.0",
         "status": "complete",
         "provider": "local:faster-whisper",
@@ -180,9 +183,16 @@ def transcribe_one(model: Any, audio: Path, args: argparse.Namespace) -> dict[st
         "language": getattr(info, "language", None),
         "language_probability": getattr(info, "language_probability", None),
         "duration_seconds": getattr(info, "duration", None),
+        "duration_after_vad_seconds": getattr(info, "duration_after_vad", None),
+        "vad_filter": not args.no_vad,
+        "speech_detected": bool(materialized),
+        "no_speech": not materialized,
         "speaker_diarization": False,
         "segments": materialized,
     }
+    if not materialized and not confirmed_no_speech(result):
+        raise RuntimeError(f"empty transcription without confirmed VAD no-speech result: {audio}")
+    return result
 
 
 def main() -> int:
@@ -193,6 +203,7 @@ def main() -> int:
     parser.add_argument("--language", default="auto", help="ISO language hint or auto")
     parser.add_argument("--task", choices=("transcribe", "translate"), default="transcribe")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument("--cpu-threads", type=int, default=0, help="CPU inference threads; 0 keeps the model default")
     parser.add_argument("--beam-size", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=0, help="Use batched inference when greater than zero")
     parser.add_argument("--word-timestamps", action="store_true")
@@ -206,6 +217,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--_uv-child", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.cpu_threads < 0:
+        parser.error("cpu threads cannot be negative")
 
     audio_files = [Path(value).expanduser().resolve() for value in args.audio]
     missing = [str(path) for path in audio_files if not path.is_file()]
@@ -216,9 +229,11 @@ def main() -> int:
         "provider": "local:faster-whisper",
         "api_key_required": False,
         "package": PACKAGE_SPEC,
+        "audio_decoder": PYAV_SPEC,
         "model": args.model,
         "language": args.language,
         "device": args.device,
+        "cpu_threads": args.cpu_threads,
         "inputs": [str(path) for path in audio_files],
         "output_dir": str(output_dir),
     }
@@ -227,6 +242,7 @@ def main() -> int:
         return 0
 
     try:
+        import av
         from faster_whisper import BatchedInferencePipeline, WhisperModel
     except ImportError:
         if args.bootstrap and not args._uv_child:
@@ -239,9 +255,25 @@ def main() -> int:
         }, ensure_ascii=False, indent=2), file=sys.stderr)
         return 2
 
+    if int(av.__version__.split(".", 1)[0]) >= 19:
+        if args.bootstrap and not args._uv_child:
+            return bootstrap_with_uv()
+        print(json.dumps({
+            "status": "blocked",
+            "stage": "dependency",
+            "error": f"{PACKAGE_SPEC} is incompatible with PyAV {av.__version__}; requires {PYAV_SPEC}",
+            "next_actions": [
+                "rerun with --bootstrap to use an isolated compatible environment",
+                f"or install {PYAV_SPEC} in the current isolated environment",
+            ],
+        }, ensure_ascii=False, indent=2), file=sys.stderr)
+        return 2
+
     output_dir.mkdir(parents=True, exist_ok=True)
     device, compute_type = choose_device(args.device)
     model_options: dict[str, Any] = {"device": device, "compute_type": compute_type}
+    if args.cpu_threads:
+        model_options["cpu_threads"] = args.cpu_threads
     if args.model_cache:
         model_options["download_root"] = str(Path(args.model_cache).expanduser().resolve())
     try:
@@ -283,7 +315,7 @@ def main() -> int:
         result["device"] = device
         result["compute_type"] = compute_type
         result["cache"] = {"source": file_fingerprint(audio), "settings": cache_settings(args)}
-        if not result.get("segments"):
+        if not result.get("segments") and not confirmed_no_speech(result):
             raise RuntimeError(f"transcription produced no speech segments: {audio}")
         atomic_write_json(target, result)
         rebuilt += 1
